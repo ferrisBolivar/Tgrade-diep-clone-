@@ -47,8 +47,8 @@ document.addEventListener('DOMContentLoaded', function () {
   let playerHealth = 5;
   const maxPlayerHealth = 5;
   let points = 0;
-  let SpawnCounter1 = 0;
-  let SpawnCounter2 = 0;
+  let triangleSpawnCounter = 0;
+  let pentagonSpawnCounter = 0;
 
   function createArena() {
     arena.innerHTML = '';
@@ -443,7 +443,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }, 300);
   }
 
-  function updateEnemies() {
+  function updateEnemies(delta) {
     const playerCenterX = playerWorldX + playerRadius;
     const playerCenterY = playerWorldY + playerRadius;
     
@@ -456,8 +456,8 @@ document.addEventListener('DOMContentLoaded', function () {
       const distance = Math.sqrt(dx * dx + dy * dy);
       
       if (distance > 0) {
-        const vx = (dx / distance) * enemy.speed;
-        const vy = (dy / distance) * enemy.speed;
+        const vx = (dx / distance) * enemy.speed * delta;
+        const vy = (dy / distance) * enemy.speed * delta;
         
         enemy.x += vx;
         enemy.y += vy;
@@ -545,18 +545,18 @@ document.addEventListener('DOMContentLoaded', function () {
     
     playerHealth = 5;
     points = 0;
-    SpawnCounter1 = 0;
-    SpawnCounter2 = 0;
+    triangleSpawnCounter = 0;
+    pentagonSpawnCounter = 0;
     updatePlayerHealth();
     updatePoints();
   }
 
-  function updateBalls() {
+  function updateBalls(delta) {
     for (let i = balls.length - 1; i >= 0; i--) {
       const ball = balls[i];
       
-      ball.x += ball.vx;
-      ball.y += ball.vy;
+      ball.x += ball.vx * delta;
+      ball.y += ball.vy * delta;
       
       ball.element.style.left = ball.x + 'px';
       ball.element.style.top = ball.y + 'px';
@@ -573,15 +573,15 @@ document.addEventListener('DOMContentLoaded', function () {
       createSquareEnemy();
     }
     
-    if (points >= 10 && SpawnCounter1 % 2 === 0) {
+    if (points >= 10 && triangleSpawnCounter % 2 === 0) {
       createRedSquareEnemy();
     }
-    SpawnCounter1++;
+    triangleSpawnCounter++;
     
-    if (points >= 20 && SpawnCounter2 % 4 === 0) {
+    if (points >= 20 && pentagonSpawnCounter % 4 === 0) {
       createPurpleSquareEnemy();
     }
-    SpawnCounter2++;
+    pentagonSpawnCounter++;
   }
 
   document.addEventListener('keydown', e => {
@@ -618,10 +618,16 @@ document.addEventListener('DOMContentLoaded', function () {
   let lastSpawnTime = 0;
   function gameLoop(timestamp) {
     if (!lastTime) lastTime = timestamp;
+    
     let deltaMS = timestamp - lastTime;
     lastTime = timestamp;
-
+    
+    if (deltaMS > 100) deltaMS = 100;
+    
+    // Convert to delta factor (1.0 = 60fps, 0.5 = 120fps, 2.0 = 30fps)
     let delta = deltaMS / frameTime;
+    
+    delta = Math.min(delta, 2.0);
 
     updateAim();
 
@@ -635,8 +641,8 @@ document.addEventListener('DOMContentLoaded', function () {
       movePlayer(dx, dy);
     }
 
-    updateBalls();
-    updateEnemies();
+    updateBalls(delta);
+    updateEnemies(delta);
     checkCollisions();
     
     if (timestamp - lastSpawnTime > 2000) {
