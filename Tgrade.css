@@ -129,20 +129,6 @@ body {
   top: 20px;
 }
 
-.level {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  background-color: rgba(128, 128, 128, 0.7);
-  padding: 12px 18px;
-  border-radius: 8px;
-  font-weight: bold;
-  font-size: 1.5rem;
-  color: #f8f8f8;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-  z-index: 20;
-}
-
 .camera {
   position: absolute;
   width: 100%;
@@ -161,25 +147,21 @@ body {
 
 .enemy {
   position: absolute;
-  background-color: yellow;
+  width: 60px;
+  height: 60px;
   border: 2px solid black;
   z-index: 10;
   transition: transform 0.1s linear;
 }
 
-.healthBar {
-  width: 60px;
-  height: 6px;
-  background-color: #ccc;
-  border: 1px solid #333;
-  border-radius: 3px;
-  margin-top: 5px;
-  overflow: hidden;
+.enemy.square {
+  background-color: yellow;
 }
 
-.healthFill {
-  height: 100%;
-  background-color: #2ecc71;
-  width: 100%;
-  transition: width 0.3s;
+.enemy.redSquare {
+  background-color: red;
+}
+
+.enemy.purpleSquare {
+  background-color: purple;
 }

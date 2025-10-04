@@ -11,6 +11,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
   let playerContainer = null;
   let barrel = null;
+  let playerHealthBar = null;
+  let pointsValue = null;
 
   const playerSize = 80;
   const playerRadius = playerSize / 2;
@@ -44,6 +46,9 @@ document.addEventListener('DOMContentLoaded', function () {
   const minimapSize = 150;
   let playerHealth = 5;
   const maxPlayerHealth = 5;
+  let points = 0;
+  let SpawnCounter1 = 0;
+  let SpawnCounter2 = 0;
 
   function createArena() {
     arena.innerHTML = '';
@@ -93,34 +98,48 @@ document.addEventListener('DOMContentLoaded', function () {
     nameDisplay.className = 'playerName';
     nameDisplay.textContent = playerNameInput.value || 'Player';
 
-    const healthBar = document.createElement('div');
-    healthBar.className = 'healthBar';
-    const healthFill = document.createElement('div');
-    healthFill.className = 'healthFill';
-    healthBar.appendChild(healthFill);
-
     barrel = document.createElement('div');
     barrel.className = 'barrel';
 
     playerContainer.appendChild(barrel);
     playerContainer.appendChild(player);
     playerContainer.appendChild(nameDisplay);
-    playerContainer.appendChild(healthBar);
     gameWorld.appendChild(playerContainer);
 
     initPlayerPosition();
+  }
+
+  function initUI() {
+    playerHealthBar = document.getElementById('playerHealthBar');
+    pointsValue = document.getElementById('pointsValue');
     updatePlayerHealth();
+    updatePoints();
   }
 
   function updatePlayerPosition() {
+    if (!playerContainer) return;
     playerContainer.style.left = playerWorldX + 'px';
     playerContainer.style.top = playerWorldY + 'px';
   }
 
   function updatePlayerHealth() {
-    const healthFill = playerContainer.querySelector('.healthFill');
+    if (!playerHealthBar) return;
+    
     const healthPercent = (playerHealth / maxPlayerHealth) * 100;
-    healthFill.style.width = healthPercent + '%';
+    playerHealthBar.style.width = healthPercent + '%';
+    
+    if (healthPercent > 60) {
+      playerHealthBar.className = 'progress-bar bg-success';
+    } else if (healthPercent > 30) {
+      playerHealthBar.className = 'progress-bar bg-warning';
+    } else {
+      playerHealthBar.className = 'progress-bar bg-danger';
+    }
+  }
+
+  function updatePoints() {
+    if (!pointsValue) return;
+    pointsValue.textContent = points;
   }
 
   function updateMousePos() {
@@ -222,7 +241,7 @@ document.addEventListener('DOMContentLoaded', function () {
     enemies.forEach(enemy => {
       const ex = (enemy.x + enemy.size / 2) * (size / worldSize);
       const ey = (enemy.y + enemy.size / 2) * (size / worldSize);
-      minimapCtx.fillStyle = 'yellow';
+      minimapCtx.fillStyle = 'red';
       minimapCtx.beginPath();
       minimapCtx.arc(ex, ey, 2, 0, Math.PI * 2);
       minimapCtx.fill();
@@ -265,27 +284,44 @@ document.addEventListener('DOMContentLoaded', function () {
     balls.push(ballObj);
   }
 
-  function createEnemy() {
+  function isPositionOutsideView(x, y, size) {
+    const screenWidth = window.innerWidth;
+    const screenHeight = window.innerHeight;
+    
+    const left = cameraX;
+    const right = cameraX + screenWidth;
+    const top = cameraY;
+    const bottom = cameraY + screenHeight;
+    
+    const enemyRight = x + size;
+    const enemyBottom = y + size;
+    
+    return enemyRight < left || x > right || enemyBottom < top || y > bottom;
+  }
+
+  function createSquareEnemy() {
     const enemySize = 60;
+    let spawnX, spawnY;
+    let attempts = 0;
+    const maxAttempts = 20;
+    
+    do {
+      spawnX = Math.random() * (worldSize - enemySize);
+      spawnY = Math.random() * (worldSize - enemySize);
+      attempts++;
+    } while (!isPositionOutsideView(spawnX, spawnY, enemySize) && attempts < maxAttempts);
+    
+    if (attempts >= maxAttempts) {
+      return;
+    }
+
     const enemy = document.createElement('div');
-    enemy.className = 'enemy';
+    enemy.className = 'enemy square';
     enemy.style.width = enemySize + 'px';
     enemy.style.height = enemySize + 'px';
     enemy.style.backgroundColor = 'yellow';
     enemy.style.border = '2px solid black';
     enemy.style.position = 'absolute';
-
-    const outerRingWidth = worldSize * 0.2;
-    let spawnX, spawnY;
-    
-    if (Math.random() < 0.5) {
-      spawnX = Math.random() < 0.5 ? Math.random() * outerRingWidth : worldSize - outerRingWidth - enemySize;
-      spawnY = Math.random() * (worldSize - enemySize);
-    } else {
-      spawnX = Math.random() * (worldSize - enemySize);
-      spawnY = Math.random() < 0.5 ? Math.random() * outerRingWidth : worldSize - outerRingWidth - enemySize;
-    }
-    
     enemy.style.left = spawnX + 'px';
     enemy.style.top = spawnY + 'px';
     
@@ -298,7 +334,98 @@ document.addEventListener('DOMContentLoaded', function () {
       size: enemySize,
       health: 2,
       maxHealth: 2,
-      speed: 6
+      speed: 4,
+      type: 'square',
+      points: 1,
+      damage: 1
+    };
+    
+    enemies.push(enemyObj);
+  }
+
+  function createRedSquareEnemy() {
+    const enemySize = 60;
+    let spawnX, spawnY;
+    let attempts = 0;
+    const maxAttempts = 20;
+    
+    do {
+      spawnX = Math.random() * (worldSize - enemySize);
+      spawnY = Math.random() * (worldSize - enemySize);
+      attempts++;
+    } while (!isPositionOutsideView(spawnX, spawnY, enemySize) && attempts < maxAttempts);
+    
+    if (attempts >= maxAttempts) {
+      return;
+    }
+
+    const enemy = document.createElement('div');
+    enemy.className = 'enemy redSquare';
+    enemy.style.width = enemySize + 'px';
+    enemy.style.height = enemySize + 'px';
+    enemy.style.backgroundColor = 'red';
+    enemy.style.border = '2px solid black';
+    enemy.style.position = 'absolute';
+    enemy.style.left = spawnX + 'px';
+    enemy.style.top = spawnY + 'px';
+    
+    gameWorld.appendChild(enemy);
+    
+    const enemyObj = {
+      element: enemy,
+      x: spawnX,
+      y: spawnY,
+      size: enemySize,
+      health: 1,
+      maxHealth: 1,
+      speed: 8,
+      type: 'redSquare',
+      points: 2,
+      damage: 1
+    };
+    
+    enemies.push(enemyObj);
+  }
+
+  function createPurpleSquareEnemy() {
+    const enemySize = 60;
+    let spawnX, spawnY;
+    let attempts = 0;
+    const maxAttempts = 20;
+    
+    do {
+      spawnX = Math.random() * (worldSize - enemySize);
+      spawnY = Math.random() * (worldSize - enemySize);
+      attempts++;
+    } while (!isPositionOutsideView(spawnX, spawnY, enemySize) && attempts < maxAttempts);
+    
+    if (attempts >= maxAttempts) {
+      return;
+    }
+
+    const enemy = document.createElement('div');
+    enemy.className = 'enemy purpleSquare';
+    enemy.style.width = enemySize + 'px';
+    enemy.style.height = enemySize + 'px';
+    enemy.style.backgroundColor = 'purple';
+    enemy.style.border = '2px solid black';
+    enemy.style.position = 'absolute';
+    enemy.style.left = spawnX + 'px';
+    enemy.style.top = spawnY + 'px';
+    
+    gameWorld.appendChild(enemy);
+    
+    const enemyObj = {
+      element: enemy,
+      x: spawnX,
+      y: spawnY,
+      size: enemySize,
+      health: 6,
+      maxHealth: 6,
+      speed: 2,
+      type: 'purpleSquare',
+      points: 3,
+      damage: 2
     };
     
     enemies.push(enemyObj);
@@ -363,6 +490,8 @@ document.addEventListener('DOMContentLoaded', function () {
           enemy.health -= 1;
           
           if (enemy.health <= 0) {
+            points += enemy.points;
+            updatePoints();
             enemyDeathAnimation(enemy);
             enemies.splice(j, 1);
           }
@@ -387,7 +516,7 @@ document.addEventListener('DOMContentLoaded', function () {
       const distance = Math.sqrt(dx * dx + dy * dy);
       
       if (distance < (playerRadius + enemy.size / 2)) {
-        playerHealth -= 1;
+        playerHealth -= enemy.damage;
         updatePlayerHealth();
         enemyDeathAnimation(enemy);
         enemies.splice(i, 1);
@@ -415,6 +544,11 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     
     playerHealth = 5;
+    points = 0;
+    SpawnCounter1 = 0;
+    SpawnCounter2 = 0;
+    updatePlayerHealth();
+    updatePoints();
   }
 
   function updateBalls() {
@@ -436,8 +570,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function spawnEnemies() {
     if (enemies.length < 5) {
-      createEnemy();
+      createSquareEnemy();
     }
+    
+    if (points >= 10 && SpawnCounter1 % 2 === 0) {
+      createRedSquareEnemy();
+    }
+    SpawnCounter1++;
+    
+    if (points >= 20 && SpawnCounter2 % 4 === 0) {
+      createPurpleSquareEnemy();
+    }
+    SpawnCounter2++;
   }
 
   document.addEventListener('keydown', e => {
@@ -514,6 +658,7 @@ document.addEventListener('DOMContentLoaded', function () {
     gameScreen.style.display = 'block';
     createArena();
     createPlayer();
+    initUI();
     createMinimap();
     gameLoop();
     inGame = true;
