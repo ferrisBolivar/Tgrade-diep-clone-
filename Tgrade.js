@@ -38,9 +38,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
   const keys = {};
   const balls = [];
+  const enemies = [];
 
   let minimapCanvas, minimapCtx;
   const minimapSize = 150;
+  let playerHealth = 5;
+  const maxPlayerHealth = 5;
 
   function createArena() {
     arena.innerHTML = '';
@@ -90,20 +93,34 @@ document.addEventListener('DOMContentLoaded', function () {
     nameDisplay.className = 'playerName';
     nameDisplay.textContent = playerNameInput.value || 'Player';
 
+    const healthBar = document.createElement('div');
+    healthBar.className = 'healthBar';
+    const healthFill = document.createElement('div');
+    healthFill.className = 'healthFill';
+    healthBar.appendChild(healthFill);
+
     barrel = document.createElement('div');
     barrel.className = 'barrel';
 
     playerContainer.appendChild(barrel);
     playerContainer.appendChild(player);
     playerContainer.appendChild(nameDisplay);
+    playerContainer.appendChild(healthBar);
     gameWorld.appendChild(playerContainer);
 
     initPlayerPosition();
+    updatePlayerHealth();
   }
 
   function updatePlayerPosition() {
     playerContainer.style.left = playerWorldX + 'px';
     playerContainer.style.top = playerWorldY + 'px';
+  }
+
+  function updatePlayerHealth() {
+    const healthFill = playerContainer.querySelector('.healthFill');
+    const healthPercent = (playerHealth / maxPlayerHealth) * 100;
+    healthFill.style.width = healthPercent + '%';
   }
 
   function updateMousePos() {
@@ -190,6 +207,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     minimapCtx.clearRect(0, 0, size, size);
 
+    minimapCtx.strokeStyle = '#333';
+    minimapCtx.lineWidth = 2;
+    minimapCtx.strokeRect(0, 0, size, size);
+
     const px = (playerWorldX + playerRadius) * (size / worldSize);
     const py = (playerWorldY + playerRadius) * (size / worldSize);
 
@@ -197,6 +218,15 @@ document.addEventListener('DOMContentLoaded', function () {
     minimapCtx.beginPath();
     minimapCtx.arc(px, py, 4, 0, Math.PI * 2);
     minimapCtx.fill();
+
+    enemies.forEach(enemy => {
+      const ex = (enemy.x + enemy.size / 2) * (size / worldSize);
+      const ey = (enemy.y + enemy.size / 2) * (size / worldSize);
+      minimapCtx.fillStyle = 'yellow';
+      minimapCtx.beginPath();
+      minimapCtx.arc(ex, ey, 2, 0, Math.PI * 2);
+      minimapCtx.fill();
+    });
   }
 
   function shoot() {
@@ -235,6 +265,158 @@ document.addEventListener('DOMContentLoaded', function () {
     balls.push(ballObj);
   }
 
+  function createEnemy() {
+    const enemySize = 60;
+    const enemy = document.createElement('div');
+    enemy.className = 'enemy';
+    enemy.style.width = enemySize + 'px';
+    enemy.style.height = enemySize + 'px';
+    enemy.style.backgroundColor = 'yellow';
+    enemy.style.border = '2px solid black';
+    enemy.style.position = 'absolute';
+
+    const outerRingWidth = worldSize * 0.2;
+    let spawnX, spawnY;
+    
+    if (Math.random() < 0.5) {
+      spawnX = Math.random() < 0.5 ? Math.random() * outerRingWidth : worldSize - outerRingWidth - enemySize;
+      spawnY = Math.random() * (worldSize - enemySize);
+    } else {
+      spawnX = Math.random() * (worldSize - enemySize);
+      spawnY = Math.random() < 0.5 ? Math.random() * outerRingWidth : worldSize - outerRingWidth - enemySize;
+    }
+    
+    enemy.style.left = spawnX + 'px';
+    enemy.style.top = spawnY + 'px';
+    
+    gameWorld.appendChild(enemy);
+    
+    const enemyObj = {
+      element: enemy,
+      x: spawnX,
+      y: spawnY,
+      size: enemySize,
+      health: 2,
+      maxHealth: 2,
+      speed: 6
+    };
+    
+    enemies.push(enemyObj);
+  }
+
+  function enemyDeathAnimation(enemy) {
+    enemy.element.style.transition = 'all 0.3s ease-out';
+    enemy.element.style.transform += ' scale(0)';
+    enemy.element.style.opacity = '0';
+    
+    setTimeout(() => {
+      if (enemy.element.parentNode) {
+        enemy.element.remove();
+      }
+    }, 300);
+  }
+
+  function updateEnemies() {
+    const playerCenterX = playerWorldX + playerRadius;
+    const playerCenterY = playerWorldY + playerRadius;
+    
+    enemies.forEach(enemy => {
+      const enemyCenterX = enemy.x + enemy.size / 2;
+      const enemyCenterY = enemy.y + enemy.size / 2;
+      
+      const dx = playerCenterX - enemyCenterX;
+      const dy = playerCenterY - enemyCenterY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      if (distance > 0) {
+        const vx = (dx / distance) * enemy.speed;
+        const vy = (dy / distance) * enemy.speed;
+        
+        enemy.x += vx;
+        enemy.y += vy;
+        
+        enemy.element.style.left = enemy.x + 'px';
+        enemy.element.style.top = enemy.y + 'px';
+        
+        const angle = Math.atan2(dy, dx);
+        enemy.element.style.transform = `rotate(${angle}rad)`;
+      }
+    });
+  }
+
+  function checkCollisions() {
+    for (let i = balls.length - 1; i >= 0; i--) {
+      const ball = balls[i];
+      const ballCenterX = ball.x + ball.size / 2;
+      const ballCenterY = ball.y + ball.size / 2;
+      
+      for (let j = enemies.length - 1; j >= 0; j--) {
+        const enemy = enemies[j];
+        const enemyCenterX = enemy.x + enemy.size / 2;
+        const enemyCenterY = enemy.y + enemy.size / 2;
+        
+        const dx = ballCenterX - enemyCenterX;
+        const dy = ballCenterY - enemyCenterY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (distance < (ball.size / 2 + enemy.size / 2)) {
+          enemy.health -= 1;
+          
+          if (enemy.health <= 0) {
+            enemyDeathAnimation(enemy);
+            enemies.splice(j, 1);
+          }
+          
+          ball.element.remove();
+          balls.splice(i, 1);
+          break;
+        }
+      }
+    }
+
+    const playerCenterX = playerWorldX + playerRadius;
+    const playerCenterY = playerWorldY + playerRadius;
+    
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      const enemy = enemies[i];
+      const enemyCenterX = enemy.x + enemy.size / 2;
+      const enemyCenterY = enemy.y + enemy.size / 2;
+      
+      const dx = playerCenterX - enemyCenterX;
+      const dy = playerCenterY - enemyCenterY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      if (distance < (playerRadius + enemy.size / 2)) {
+        playerHealth -= 1;
+        updatePlayerHealth();
+        enemyDeathAnimation(enemy);
+        enemies.splice(i, 1);
+        
+        if (playerHealth <= 0) {
+          gameOver();
+        }
+      }
+    }
+  }
+
+  function gameOver() {
+    inGame = false;
+    gameScreen.style.display = 'none';
+    startScreen.style.display = 'block';
+    
+    balls.forEach(ball => ball.element.remove());
+    enemies.forEach(enemy => enemy.element.remove());
+    balls.length = 0;
+    enemies.length = 0;
+    
+    if (playerContainer) {
+      playerContainer.remove();
+      playerContainer = null;
+    }
+    
+    playerHealth = 5;
+  }
+
   function updateBalls() {
     for (let i = balls.length - 1; i >= 0; i--) {
       const ball = balls[i];
@@ -252,6 +434,12 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   }
 
+  function spawnEnemies() {
+    if (enemies.length < 5) {
+      createEnemy();
+    }
+  }
+
   document.addEventListener('keydown', e => {
     if (e.key) keys[e.key.toLowerCase()] = true;
   });
@@ -265,7 +453,6 @@ document.addEventListener('DOMContentLoaded', function () {
     mouseScreenY = e.clientY;
   });
 
-  // Prevent dragging
   document.addEventListener('dragstart', e => {
     e.preventDefault();
   });
@@ -278,13 +465,13 @@ document.addEventListener('DOMContentLoaded', function () {
     e.preventDefault();
   });
 
-  // Prevent text selection
   document.body.style.userSelect = 'none';
   document.body.style.webkitUserSelect = 'none';
   document.body.style.mozUserSelect = 'none';
   document.body.style.msUserSelect = 'none';
 
   let lastTime = 0;
+  let lastSpawnTime = 0;
   function gameLoop(timestamp) {
     if (!lastTime) lastTime = timestamp;
     let deltaMS = timestamp - lastTime;
@@ -305,6 +492,14 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     updateBalls();
+    updateEnemies();
+    checkCollisions();
+    
+    if (timestamp - lastSpawnTime > 2000) {
+      spawnEnemies();
+      lastSpawnTime = timestamp;
+    }
+    
     updateMinimap();
 
     requestAnimationFrame(gameLoop);

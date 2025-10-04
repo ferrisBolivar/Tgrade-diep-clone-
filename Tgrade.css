@@ -158,3 +158,28 @@ body {
   z-index: 15;
   pointer-events: none;
 }
+
+.enemy {
+  position: absolute;
+  background-color: yellow;
+  border: 2px solid black;
+  z-index: 10;
+  transition: transform 0.1s linear;
+}
+
+.healthBar {
+  width: 60px;
+  height: 6px;
+  background-color: #ccc;
+  border: 1px solid #333;
+  border-radius: 3px;
+  margin-top: 5px;
+  overflow: hidden;
+}
+
+.healthFill {
+  height: 100%;
+  background-color: #2ecc71;
+  width: 100%;
+  transition: width 0.3s;
+}
