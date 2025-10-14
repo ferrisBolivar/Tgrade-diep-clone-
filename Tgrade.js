@@ -641,6 +641,10 @@ document.addEventListener('DOMContentLoaded', function () {
     clearEnemies();
     updatePlayerHealth();
     updateAllPointsDisplays();
+    updateUpgradeMenu();
+
+
+
   }
 
   function updateBalls(delta) {
