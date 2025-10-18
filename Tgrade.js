@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', function () {
+  // DOM Elements
   const startScreen = document.getElementById('startScreen');
   const gameScreen = document.getElementById('gameScreen');
   const camera = document.getElementById('camera');
@@ -7,103 +8,107 @@ document.addEventListener('DOMContentLoaded', function () {
   const playBtn = document.getElementById('playBtn');
   const playerNameInput = document.getElementById('playerName');
 
-  let inGame = false;
+  // Game Constants
+  const PLAYER_SIZE = 80;
+  const PLAYER_RADIUS = PLAYER_SIZE / 2;
+  const TARGET_FPS = 60;
+  const FRAME_TIME = 1000 / TARGET_FPS;
+  const GRID_COLS = 3;
+  const GRID_ROWS = 3;
+  const SUB_GRID_SIZE = 5;
+  const WORLD_SIZE = Math.max(window.innerWidth, window.innerHeight) * 1.5;
+  const MINIMAP_SIZE = 150;
 
-  let playerContainer = null;
-  let barrel = null;
-  let playerHealthBar = null;
-  let pointsValue = null;
+  // Game State
+  let state = {
+    inGame: false,
+    gamePaused: false,
+    upgradeMenuOpen: false,
+    mouseDown: false,
+    lastTime: 0,
+    lastSpawnTime: 0,
+    lastShotTime: 0,
+    keys: {},
+    mouseScreenX: window.innerWidth / 2,
+    mouseScreenY: window.innerHeight / 2,
+    mouseWorldX: WORLD_SIZE / 2,
+    mouseWorldY: WORLD_SIZE / 2,
+    cameraX: 0,
+    cameraY: 0,
+    playerWorldX: 0,
+    playerWorldY: 0,
+    playerHealth: 5,
+    maxPlayerHealth: 5,
+    points: 0,
+    triangleSpawnCounter: 0,
+    pentagonSpawnCounter: 0,
+    moveSpeed: 5,
+    shotCooldown: 250,
+    playerDamage: 1,
+    bulletSpeed: 8,
+    speedLevel: 0,
+    healthLevel: 0,
+    damageLevel: 0,
+    reloadLevel: 0,
+    bulletSpeedLevel: 0
+  };
 
-  const playerSize = 80;
-  const playerRadius = playerSize / 2;
+  // Game Objects
+  const objects = {
+    playerContainer: null,
+    barrel: null,
+    playerHealthBar: null,
+    pointsValue: null,
+    minimapCanvas: null,
+    minimapCtx: null,
+    balls: [],
+    enemies: []
+  };
 
-  let moveSpeed = 5;
-  const targetFPS = 60;
-  const frameTime = 1000 / targetFPS;
-
-  const gridCols = 3;
-  const gridRows = 3;
-  const subGridSize = 5;
-  const worldSize = Math.max(window.innerWidth, window.innerHeight) * 1.5;
-
-  let playerWorldX = 0;
-  let playerWorldY = 0;
-
-  let mouseScreenX = window.innerWidth / 2;
-  let mouseScreenY = window.innerHeight / 2;
-
-  let mouseWorldX = worldSize / 2;
-  let mouseWorldY = worldSize / 2;
-
-  let cameraX = 0;
-  let cameraY = 0;
-
-  const keys = {};
-  const balls = [];
-  const enemies = [];
-
-  let minimapCanvas, minimapCtx;
-  const minimapSize = 150;
-  let playerHealth = 5;
-  let maxPlayerHealth = 5;
-  let points = 1000000;
-  let triangleSpawnCounter = 0;
-  let pentagonSpawnCounter = 0;
-
-  let lastShotTime = 0;
-  let shotCooldown = 250;
-  let mouseDown = false;
-  let upgradeMenuOpen = false;
-  let gamePaused = false;
-
-  let playerDamage = 1;
-  let bulletSpeed = 8;
-  let speedLevel = 0;
-  let healthLevel = 0;
-  let damageLevel = 0;
-  let reloadLevel = 0;
-  let bulletSpeedLevel = 0;
+  // Core Game Functions
+  function initGame() {
+    createArena();
+    createPlayer();
+    initUI();
+    createMinimap();
+    createUpgradeMenu();
+    state.inGame = true;
+    gameLoop();
+  }
 
   function createArena() {
     arena.innerHTML = '';
-    gameWorld.style.width = worldSize + 'px';
-    gameWorld.style.height = worldSize + 'px';
-    const cellSize = worldSize / 3;
+    gameWorld.style.width = WORLD_SIZE + 'px';
+    gameWorld.style.height = WORLD_SIZE + 'px';
+    const cellSize = WORLD_SIZE / 3;
 
-    for (let row = 0; row < gridRows; row++) {
-      for (let col = 0; col < gridCols; col++) {
-        const gridCell = document.createElement('div');
-        gridCell.className = 'gridCell';
-        gridCell.style.width = cellSize + 'px';
-        gridCell.style.height = cellSize + 'px';
-        gridCell.style.position = 'absolute';
-        gridCell.style.left = (col * cellSize) + 'px';
-        gridCell.style.top = (row * cellSize) + 'px';
-
-        for (let i = 0; i < subGridSize; i++) {
-          for (let j = 0; j < subGridSize; j++) {
-            const subGrid = document.createElement('div');
-            subGrid.className = 'subGrid';
-            subGrid.style.gridColumn = (j + 1);
-            subGrid.style.gridRow = (i + 1);
-            gridCell.appendChild(subGrid);
-          }
-        }
+    for (let row = 0; row < GRID_ROWS; row++) {
+      for (let col = 0; col < GRID_COLS; col++) {
+        const gridCell = createGridCell(cellSize, row, col);
         arena.appendChild(gridCell);
       }
     }
   }
 
-  function initPlayerPosition() {
-    playerWorldX = worldSize / 2 - playerSize / 2;
-    playerWorldY = worldSize / 2 - playerSize / 2;
-    updatePlayerPosition();
-    updateCamera();
+  function createGridCell(size, row, col) {
+    const gridCell = document.createElement('div');
+    gridCell.className = 'gridCell';
+    gridCell.style.cssText = `width:${size}px;height:${size}px;position:absolute;left:${col * size}px;top:${row * size}px`;
+
+    for (let i = 0; i < SUB_GRID_SIZE; i++) {
+      for (let j = 0; j < SUB_GRID_SIZE; j++) {
+        const subGrid = document.createElement('div');
+        subGrid.className = 'subGrid';
+        subGrid.style.cssText = `grid-column:${j + 1};grid-row:${i + 1}`;
+        gridCell.appendChild(subGrid);
+      }
+    }
+    return gridCell;
   }
 
   function createPlayer() {
-    playerContainer = document.createElement('div');
-    playerContainer.className = 'playerContainer';
+    objects.playerContainer = document.createElement('div');
+    objects.playerContainer.className = 'playerContainer';
 
     const player = document.createElement('div');
     player.className = 'player';
@@ -112,376 +117,217 @@ document.addEventListener('DOMContentLoaded', function () {
     nameDisplay.className = 'playerName';
     nameDisplay.textContent = playerNameInput.value || 'Player';
 
-    barrel = document.createElement('div');
-    barrel.className = 'barrel';
+    objects.barrel = document.createElement('div');
+    objects.barrel.className = 'barrel';
 
-    playerContainer.appendChild(barrel);
-    playerContainer.appendChild(player);
-    playerContainer.appendChild(nameDisplay);
-    gameWorld.appendChild(playerContainer);
+    objects.playerContainer.appendChild(objects.barrel);
+    objects.playerContainer.appendChild(player);
+    objects.playerContainer.appendChild(nameDisplay);
+    gameWorld.appendChild(objects.playerContainer);
 
     initPlayerPosition();
   }
 
-  function initUI() {
-    playerHealthBar = document.getElementById('playerHealthBar');
-    pointsValue = document.getElementById('pointsValue');
-    updatePlayerHealth();
-    updateAllPointsDisplays();
+  function initPlayerPosition() {
+    state.playerWorldX = WORLD_SIZE / 2 - PLAYER_SIZE / 2;
+    state.playerWorldY = WORLD_SIZE / 2 - PLAYER_SIZE / 2;
+    updatePlayerPosition();
+    updateCamera();
   }
 
+  function initUI() {
+    objects.playerHealthBar = document.getElementById('playerHealthBar');
+    objects.pointsValue = document.getElementById('pointsValue');
+    updatePlayerHealth();
+    updatePoints();
+  }
+
+  // Update Functions
   function updatePlayerPosition() {
-    if (!playerContainer) return;
-    playerContainer.style.left = playerWorldX + 'px';
-    playerContainer.style.top = playerWorldY + 'px';
+    if (!objects.playerContainer) return;
+    objects.playerContainer.style.left = state.playerWorldX + 'px';
+    objects.playerContainer.style.top = state.playerWorldY + 'px';
   }
 
   function updatePlayerHealth() {
-    if (!playerHealthBar) return;
-
-    const healthPercent = (playerHealth / maxPlayerHealth) * 100;
-    playerHealthBar.style.width = healthPercent + '%';
-
-    if (healthPercent > 60) {
-      playerHealthBar.className = 'progress-bar bg-success';
-    } else if (healthPercent > 30) {
-      playerHealthBar.className = 'progress-bar bg-warning';
-    } else {
-      playerHealthBar.className = 'progress-bar bg-danger';
-    }
+    if (!objects.playerHealthBar) return;
+    const healthPercent = (state.playerHealth / state.maxPlayerHealth) * 100;
+    objects.playerHealthBar.style.width = healthPercent + '%';
+    
+    if (healthPercent > 60) objects.playerHealthBar.className = 'progress-bar bg-success';
+    else if (healthPercent > 30) objects.playerHealthBar.className = 'progress-bar bg-warning';
+    else objects.playerHealthBar.className = 'progress-bar bg-danger';
   }
 
   function updatePoints() {
-    if (!pointsValue) return;
-    pointsValue.textContent = points;
-  }
-
-  function updateAllPointsDisplays() {
-    updatePoints();
+    if (!objects.pointsValue) return;
+    objects.pointsValue.textContent = state.points;
     const upgradePointsDisplay = document.getElementById('upgradePointsDisplay');
-    if (upgradePointsDisplay) {
-      upgradePointsDisplay.textContent = 'Points: ' + points;
-    }
+    if (upgradePointsDisplay) upgradePointsDisplay.textContent = 'Points: ' + state.points;
     refreshUpgradeButtons();
   }
 
-
   function updateMousePos() {
-    mouseWorldX = mouseScreenX + cameraX;
-    mouseWorldY = mouseScreenY + cameraY;
+    state.mouseWorldX = state.mouseScreenX + state.cameraX;
+    state.mouseWorldY = state.mouseScreenY + state.cameraY;
   }
 
   function getAim() {
     updateMousePos();
-    const playerCenterX = playerWorldX + playerRadius;
-    const playerCenterY = playerWorldY + playerRadius;
-    const dx = mouseWorldX - playerCenterX;
-    const dy = mouseWorldY - playerCenterY;
-    const angle = Math.atan2(dy, dx);
-    return angle;
+    const playerCenterX = state.playerWorldX + PLAYER_RADIUS;
+    const playerCenterY = state.playerWorldY + PLAYER_RADIUS;
+    const dx = state.mouseWorldX - playerCenterX;
+    const dy = state.mouseWorldY - playerCenterY;
+    return Math.atan2(dy, dx);
   }
 
   function updateAim() {
-    if (!barrel) return;
-    const angle = getAim();
-    barrel.style.transform = `rotate(${angle}rad)`;
+    if (!objects.barrel) return;
+    objects.barrel.style.transform = `rotate(${getAim()}rad)`;
   }
 
   function updateCamera() {
     const screenWidth = window.innerWidth;
     const screenHeight = window.innerHeight;
-    const idealCameraX = playerWorldX - screenWidth / 2 + playerRadius;
-    const idealCameraY = playerWorldY - screenHeight / 2 + playerRadius;
+    const idealCameraX = state.playerWorldX - screenWidth / 2 + PLAYER_RADIUS;
+    const idealCameraY = state.playerWorldY - screenHeight / 2 + PLAYER_RADIUS;
 
-    cameraX = Math.max(0, Math.min(idealCameraX, worldSize - screenWidth));
-    cameraY = Math.max(0, Math.min(idealCameraY, worldSize - screenHeight));
+    state.cameraX = Math.max(0, Math.min(idealCameraX, WORLD_SIZE - screenWidth));
+    state.cameraY = Math.max(0, Math.min(idealCameraY, WORLD_SIZE - screenHeight));
 
-    gameWorld.style.transform = `translate(${-cameraX}px, ${-cameraY}px)`;
+    gameWorld.style.transform = `translate(${-state.cameraX}px, ${-state.cameraY}px)`;
   }
 
   function isPositionValid(x, y) {
-    return x >= 0 &&
-      x <= worldSize - playerSize &&
-      y >= 0 &&
-      y <= worldSize - playerSize;
+    return x >= 0 && x <= WORLD_SIZE - PLAYER_SIZE && y >= 0 && y <= WORLD_SIZE - PLAYER_SIZE;
   }
 
   function movePlayer(dx, dy) {
-    const newX = playerWorldX + dx;
-    const newY = playerWorldY + dy;
+    const newX = state.playerWorldX + dx;
+    const newY = state.playerWorldY + dy;
     if (isPositionValid(newX, newY)) {
-      playerWorldX = newX;
-      playerWorldY = newY;
+      state.playerWorldX = newX;
+      state.playerWorldY = newY;
       updatePlayerPosition();
       updateCamera();
     }
   }
 
-  function createMinimap() {
-    const existingMinimap = document.querySelector('.minimapCard');
-    if (existingMinimap) {
-      existingMinimap.remove();
-    }
-
-    const minimapCard = document.createElement('div');
-    minimapCard.className = 'minimapCard';
-    minimapCard.style.position = 'fixed';
-    minimapCard.style.top = '20px';
-    minimapCard.style.left = '20px';
-    minimapCard.style.width = minimapSize + 'px';
-    minimapCard.style.height = minimapSize + 'px';
-    minimapCard.style.background = 'rgba(255, 255, 255, 0.9)';
-    minimapCard.style.borderRadius = '8px';
-    minimapCard.style.zIndex = '50';
-    minimapCard.style.padding = '5px';
-
-    minimapCanvas = document.createElement('canvas');
-    minimapCanvas.width = minimapSize - 10;
-    minimapCanvas.height = minimapSize - 10;
-    minimapCtx = minimapCanvas.getContext('2d');
-
-    minimapCard.appendChild(minimapCanvas);
-    document.body.appendChild(minimapCard);
-  }
-
-  function updateMinimap() {
-    if (!minimapCtx) return;
-    const size = minimapCanvas.width;
-
-    minimapCtx.clearRect(0, 0, size, size);
-
-    minimapCtx.strokeStyle = '#333';
-    minimapCtx.lineWidth = 2;
-    minimapCtx.strokeRect(0, 0, size, size);
-
-    const px = (playerWorldX + playerRadius) * (size / worldSize);
-    const py = (playerWorldY + playerRadius) * (size / worldSize);
-
-    minimapCtx.fillStyle = 'blue';
-    minimapCtx.beginPath();
-    minimapCtx.arc(px, py, 4, 0, Math.PI * 2);
-    minimapCtx.fill();
-
-    enemies.forEach(enemy => {
-      const ex = (enemy.x + enemy.size / 2) * (size / worldSize);
-      const ey = (enemy.y + enemy.size / 2) * (size / worldSize);
-      minimapCtx.fillStyle = 'red';
-      minimapCtx.beginPath();
-      minimapCtx.arc(ex, ey, 2, 0, Math.PI * 2);
-      minimapCtx.fill();
-    });
-  }
-
+  // Combat Functions
   function shoot() {
     const currentTime = Date.now();
-    if (currentTime - lastShotTime < shotCooldown) {
-      return;
-    }
+    if (currentTime - state.lastShotTime < state.shotCooldown) return;
 
-    lastShotTime = currentTime;
-
+    state.lastShotTime = currentTime;
     const angle = getAim();
-    const ballSize = playerRadius;
+    const ballSize = PLAYER_RADIUS;
 
     const ball = document.createElement('div');
     ball.className = 'ball';
-    ball.style.width = ballSize + 'px';
-    ball.style.height = ballSize + 'px';
-    ball.style.backgroundColor = '#3498db';
-    ball.style.border = '2px solid black';
+    ball.style.cssText = `width:${ballSize}px;height:${ballSize}px;background-color:#3498db;border:2px solid black`;
 
     const barrelLength = 50;
-    const barrelEndX = playerWorldX + playerRadius + Math.cos(angle) * (playerRadius + barrelLength);
-    const barrelEndY = playerWorldY + playerRadius + Math.sin(angle) * (playerRadius + barrelLength);
+    const barrelEndX = state.playerWorldX + PLAYER_RADIUS + Math.cos(angle) * (PLAYER_RADIUS + barrelLength);
+    const barrelEndY = state.playerWorldY + PLAYER_RADIUS + Math.sin(angle) * (PLAYER_RADIUS + barrelLength);
 
     const ballStartX = barrelEndX - ballSize / 2;
     const ballStartY = barrelEndY - ballSize / 2;
 
     ball.style.left = ballStartX + 'px';
     ball.style.top = ballStartY + 'px';
-
     gameWorld.appendChild(ball);
 
-    const ballObj = {
+    objects.balls.push({
       element: ball,
       x: ballStartX,
       y: ballStartY,
-      vx: Math.cos(angle) * bulletSpeed,
-      vy: Math.sin(angle) * bulletSpeed,
+      vx: Math.cos(angle) * state.bulletSpeed,
+      vy: Math.sin(angle) * state.bulletSpeed,
       size: ballSize,
-      damage: playerDamage
-    };
-
-    balls.push(ballObj);
+      damage: state.playerDamage
+    });
   }
 
+  function updateBalls(delta) {
+    for (let i = objects.balls.length - 1; i >= 0; i--) {
+      const ball = objects.balls[i];
+      ball.x += ball.vx * delta;
+      ball.y += ball.vy * delta;
+      ball.element.style.left = ball.x + 'px';
+      ball.element.style.top = ball.y + 'px';
+
+      if (ball.x < 0 || ball.x > WORLD_SIZE || ball.y < 0 || ball.y > WORLD_SIZE) {
+        ball.element.remove();
+        objects.balls.splice(i, 1);
+      }
+    }
+  }
+
+  // Enemy Functions
   function isPositionOutsideView(x, y, size) {
     const screenWidth = window.innerWidth;
     const screenHeight = window.innerHeight;
-
-    const left = cameraX;
-    const right = cameraX + screenWidth;
-    const top = cameraY;
-    const bottom = cameraY + screenHeight;
-
+    const left = state.cameraX;
+    const right = state.cameraX + screenWidth;
+    const top = state.cameraY;
+    const bottom = state.cameraY + screenHeight;
     const enemyRight = x + size;
     const enemyBottom = y + size;
 
     return enemyRight < left || x > right || enemyBottom < top || y > bottom;
   }
 
-  function createSquareEnemy() {
+  function createEnemy(type, config) {
     const enemySize = 60;
-    let spawnX, spawnY;
-    let attempts = 0;
+    let spawnX, spawnY, attempts = 0;
     const maxAttempts = 20;
 
     do {
-      spawnX = Math.random() * (worldSize - enemySize);
-      spawnY = Math.random() * (worldSize - enemySize);
+      spawnX = Math.random() * (WORLD_SIZE - enemySize);
+      spawnY = Math.random() * (WORLD_SIZE - enemySize);
       attempts++;
     } while (!isPositionOutsideView(spawnX, spawnY, enemySize) && attempts < maxAttempts);
 
-    if (attempts >= maxAttempts) {
-      return;
-    }
+    if (attempts >= maxAttempts) return;
 
     const enemy = document.createElement('div');
-    enemy.className = 'enemy square';
-    enemy.style.width = enemySize + 'px';
-    enemy.style.height = enemySize + 'px';
-    enemy.style.backgroundColor = 'yellow';
-    enemy.style.border = '2px solid black';
-    enemy.style.position = 'absolute';
-    enemy.style.left = spawnX + 'px';
-    enemy.style.top = spawnY + 'px';
-
+    enemy.className = `enemy ${type}`;
+    enemy.style.cssText = `width:${enemySize}px;height:${enemySize}px;background-color:${config.color};border:2px solid black;position:absolute;left:${spawnX}px;top:${spawnY}px`;
     gameWorld.appendChild(enemy);
 
-    const enemyObj = {
+    objects.enemies.push({
       element: enemy,
       x: spawnX,
       y: spawnY,
       size: enemySize,
-      health: 2,
-      maxHealth: 2,
-      speed: 4,
-      type: 'square',
-      points: 1,
-      damage: 1
-    };
+      health: config.health,
+      maxHealth: config.health,
+      speed: config.speed,
+      type: type,
+      points: config.points,
+      damage: config.damage
+    });
+  }
 
-    enemies.push(enemyObj);
+  function createSquareEnemy() {
+    createEnemy('square', { color: 'yellow', health: 2, speed: 4, points: 1, damage: 1 });
   }
 
   function createRedSquareEnemy() {
-    const enemySize = 60;
-    let spawnX, spawnY;
-    let attempts = 0;
-    const maxAttempts = 20;
-
-    do {
-      spawnX = Math.random() * (worldSize - enemySize);
-      spawnY = Math.random() * (worldSize - enemySize);
-      attempts++;
-    } while (!isPositionOutsideView(spawnX, spawnY, enemySize) && attempts < maxAttempts);
-
-    if (attempts >= maxAttempts) {
-      return;
-    }
-
-    const enemy = document.createElement('div');
-    enemy.className = 'enemy redSquare';
-    enemy.style.width = enemySize + 'px';
-    enemy.style.height = enemySize + 'px';
-    enemy.style.backgroundColor = 'red';
-    enemy.style.border = '2px solid black';
-    enemy.style.position = 'absolute';
-    enemy.style.left = spawnX + 'px';
-    enemy.style.top = spawnY + 'px';
-
-    gameWorld.appendChild(enemy);
-
-    const enemyObj = {
-      element: enemy,
-      x: spawnX,
-      y: spawnY,
-      size: enemySize,
-      health: 1,
-      maxHealth: 1,
-      speed: 8,
-      type: 'redSquare',
-      points: 2,
-      damage: 1
-    };
-
-    enemies.push(enemyObj);
+    createEnemy('redSquare', { color: 'red', health: 1, speed: 8, points: 2, damage: 1 });
   }
 
   function createPurpleSquareEnemy() {
-    const enemySize = 60;
-    let spawnX, spawnY;
-    let attempts = 0;
-    const maxAttempts = 20;
-
-    do {
-      spawnX = Math.random() * (worldSize - enemySize);
-      spawnY = Math.random() * (worldSize - enemySize);
-      attempts++;
-    } while (!isPositionOutsideView(spawnX, spawnY, enemySize) && attempts < maxAttempts);
-
-    if (attempts >= maxAttempts) {
-      return;
-    }
-
-    const enemy = document.createElement('div');
-    enemy.className = 'enemy purpleSquare';
-    enemy.style.width = enemySize + 'px';
-    enemy.style.height = enemySize + 'px';
-    enemy.style.backgroundColor = 'purple';
-    enemy.style.border = '2px solid black';
-    enemy.style.position = 'absolute';
-    enemy.style.left = spawnX + 'px';
-    enemy.style.top = spawnY + 'px';
-
-    gameWorld.appendChild(enemy);
-
-    const enemyObj = {
-      element: enemy,
-      x: spawnX,
-      y: spawnY,
-      size: enemySize,
-      health: 6,
-      maxHealth: 6,
-      speed: 2,
-      type: 'purpleSquare',
-      points: 3,
-      damage: 2
-    };
-
-    enemies.push(enemyObj);
-  }
-
-  function enemyDeathAnimation(enemy) {
-    enemy.element.style.transition = 'all 0.3s ease-out';
-    enemy.element.style.transform += ' scale(0)';
-    enemy.element.style.opacity = '0';
-
-    setTimeout(() => {
-      if (enemy.element.parentNode) {
-        enemy.element.remove();
-      }
-    }, 300);
+    createEnemy('purpleSquare', { color: 'purple', health: 6, speed: 2, points: 3, damage: 2 });
   }
 
   function updateEnemies(delta) {
-    const playerCenterX = playerWorldX + playerRadius;
-    const playerCenterY = playerWorldY + playerRadius;
+    const playerCenterX = state.playerWorldX + PLAYER_RADIUS;
+    const playerCenterY = state.playerWorldY + PLAYER_RADIUS;
 
-    enemies.forEach(enemy => {
+    objects.enemies.forEach(enemy => {
       const enemyCenterX = enemy.x + enemy.size / 2;
       const enemyCenterY = enemy.y + enemy.size / 2;
-
       const dx = playerCenterX - enemyCenterX;
       const dy = playerCenterY - enemyCenterY;
       const distance = Math.sqrt(dx * dx + dy * dy);
@@ -489,30 +335,36 @@ document.addEventListener('DOMContentLoaded', function () {
       if (distance > 0) {
         const vx = (dx / distance) * enemy.speed * delta;
         const vy = (dy / distance) * enemy.speed * delta;
-
         enemy.x += vx;
         enemy.y += vy;
-
         enemy.element.style.left = enemy.x + 'px';
         enemy.element.style.top = enemy.y + 'px';
-
-        const angle = Math.atan2(dy, dx);
-        enemy.element.style.transform = `rotate(${angle}rad)`;
+        enemy.element.style.transform = `rotate(${Math.atan2(dy, dx)}rad)`;
       }
     });
   }
 
+  function enemyDeathAnimation(enemy) {
+    enemy.element.style.transition = 'all 0.3s ease-out';
+    enemy.element.style.transform += ' scale(0)';
+    enemy.element.style.opacity = '0';
+    setTimeout(() => enemy.element.parentNode && enemy.element.remove(), 300);
+  }
+
   function checkCollisions() {
-    for (let i = balls.length - 1; i >= 0; i--) {
-      const ball = balls[i];
+    const playerCenterX = state.playerWorldX + PLAYER_RADIUS;
+    const playerCenterY = state.playerWorldY + PLAYER_RADIUS;
+
+    // Ball-Enemy collisions
+    for (let i = objects.balls.length - 1; i >= 0; i--) {
+      const ball = objects.balls[i];
       const ballCenterX = ball.x + ball.size / 2;
       const ballCenterY = ball.y + ball.size / 2;
 
-      for (let j = enemies.length - 1; j >= 0; j--) {
-        const enemy = enemies[j];
+      for (let j = objects.enemies.length - 1; j >= 0; j--) {
+        const enemy = objects.enemies[j];
         const enemyCenterX = enemy.x + enemy.size / 2;
         const enemyCenterY = enemy.y + enemy.size / 2;
-
         const dx = ballCenterX - enemyCenterX;
         const dy = ballCenterY - enemyCenterY;
         const distance = Math.sqrt(dx * dx + dy * dy);
@@ -521,165 +373,97 @@ document.addEventListener('DOMContentLoaded', function () {
           enemy.health -= ball.damage;
 
           if (enemy.health <= 0) {
-            points += enemy.points;
-            updateAllPointsDisplays();
+            state.points += enemy.points;
+            updatePoints();
             enemyDeathAnimation(enemy);
-            enemies.splice(j, 1);
+            objects.enemies.splice(j, 1);
           }
 
           ball.element.remove();
-          balls.splice(i, 1);
+          objects.balls.splice(i, 1);
           break;
         }
       }
     }
 
-    const playerCenterX = playerWorldX + playerRadius;
-    const playerCenterY = playerWorldY + playerRadius;
-
-    for (let i = enemies.length - 1; i >= 0; i--) {
-      const enemy = enemies[i];
+    // Player-Enemy collisions
+    for (let i = objects.enemies.length - 1; i >= 0; i--) {
+      const enemy = objects.enemies[i];
       const enemyCenterX = enemy.x + enemy.size / 2;
       const enemyCenterY = enemy.y + enemy.size / 2;
-
       const dx = playerCenterX - enemyCenterX;
       const dy = playerCenterY - enemyCenterY;
       const distance = Math.sqrt(dx * dx + dy * dy);
 
-      if (distance < (playerRadius + enemy.size / 2)) {
-        playerHealth -= enemy.damage;
+      if (distance < (PLAYER_RADIUS + enemy.size / 2)) {
+        state.playerHealth -= enemy.damage;
         updatePlayerHealth();
         enemyDeathAnimation(enemy);
-        enemies.splice(i, 1);
+        objects.enemies.splice(i, 1);
 
-        if (playerHealth <= 0) {
-          gameOver();
-        }
+        if (state.playerHealth <= 0) gameOver();
       }
     }
   }
 
   function clearEnemies() {
-    enemies.forEach(enemy => {
-      if (enemy.element && enemy.element.parentNode) {
-        enemy.element.remove();
-      }
-    });
-    enemies.length = 0;
-  }
-
-
-  function gameOver() {
-    inGame = false;
-    gameScreen.style.display = 'none';
-    showDeathScreen();
-
-    balls.forEach(ball => ball.element.remove());
-    balls.length = 0;
-    clearEnemies();
-
-
-    if (playerContainer) {
-      playerContainer.remove();
-      playerContainer = null;
-    }
-
-    closeUpgradeMenu();
-  }
-
-  function showDeathScreen() {
-    const deathScreen = document.createElement('div');
-    deathScreen.className = 'deathScreen';
-
-    const deathContent = document.createElement('div');
-    deathContent.className = 'deathContent';
-
-    const deathTitle = document.createElement('h1');
-    deathTitle.textContent = 'YOU DIED';
-    deathTitle.className = 'deathTitle';
-
-    const deathScore = document.createElement('div');
-    deathScore.textContent = 'Final Score: ' + points;
-    deathScore.className = 'deathScore';
-
-    const restartButton = document.createElement('button');
-    restartButton.textContent = 'Continue';
-    restartButton.className = 'deathButton';
-    restartButton.addEventListener('click', () => {
-      deathScreen.remove();
-      startScreen.style.display = 'block';
-      resetGameStats();
-    });
-
-    deathContent.appendChild(deathTitle);
-    deathContent.appendChild(deathScore);
-    deathContent.appendChild(restartButton);
-    deathScreen.appendChild(deathContent);
-
-    document.body.appendChild(deathScreen);
-
-    setTimeout(() => {
-      deathScreen.classList.add('show');
-    }, 100);
-  }
-
-  function resetGameStats() {
-    playerHealth = 5;
-    maxPlayerHealth = 5;
-    points = 0;
-    triangleSpawnCounter = 0;
-    pentagonSpawnCounter = 0;
-    moveSpeed = 5;
-    shotCooldown = 250;
-    playerDamage = 1;
-    bulletSpeed = 8;
-    speedLevel = 0;
-    healthLevel = 0;
-    damageLevel = 0;
-    reloadLevel = 0;
-    bulletSpeedLevel = 0;
-    clearEnemies();
-    updatePlayerHealth();
-    updateAllPointsDisplays();
-    updateUpgradeMenu();
-
-
-
-  }
-
-  function updateBalls(delta) {
-    for (let i = balls.length - 1; i >= 0; i--) {
-      const ball = balls[i];
-
-      ball.x += ball.vx * delta;
-      ball.y += ball.vy * delta;
-
-      ball.element.style.left = ball.x + 'px';
-      ball.element.style.top = ball.y + 'px';
-
-      if (ball.x < 0 || ball.x > worldSize || ball.y < 0 || ball.y > worldSize) {
-        ball.element.remove();
-        balls.splice(i, 1);
-      }
-    }
+    objects.enemies.forEach(enemy => enemy.element.parentNode && enemy.element.remove());
+    objects.enemies.length = 0;
   }
 
   function spawnEnemies() {
-    if (enemies.length < 5) {
-      createSquareEnemy();
-    }
-
-    if (points >= 10 && triangleSpawnCounter % 2 === 0) {
-      createRedSquareEnemy();
-    }
-    triangleSpawnCounter++;
-
-    if (points >= 20 && pentagonSpawnCounter % 4 === 0) {
-      createPurpleSquareEnemy();
-    }
-    pentagonSpawnCounter++;
+    if (objects.enemies.length < 5) createSquareEnemy();
+    if (state.points >= 10 && state.triangleSpawnCounter % 2 === 0) createRedSquareEnemy();
+    if (state.points >= 20 && state.pentagonSpawnCounter % 4 === 0) createPurpleSquareEnemy();
+    state.triangleSpawnCounter++;
+    state.pentagonSpawnCounter++;
   }
 
+  // UI Functions
+  function createMinimap() {
+    const existingMinimap = document.querySelector('.minimapCard');
+    if (existingMinimap) existingMinimap.remove();
+
+    const minimapCard = document.createElement('div');
+    minimapCard.className = 'minimapCard';
+    minimapCard.style.cssText = `position:fixed;top:20px;left:20px;width:${MINIMAP_SIZE}px;height:${MINIMAP_SIZE}px;background:rgba(255,255,255,0.9);border-radius:8px;z-index:50;padding:5px`;
+
+    objects.minimapCanvas = document.createElement('canvas');
+    objects.minimapCanvas.width = MINIMAP_SIZE - 10;
+    objects.minimapCanvas.height = MINIMAP_SIZE - 10;
+    objects.minimapCtx = objects.minimapCanvas.getContext('2d');
+
+    minimapCard.appendChild(objects.minimapCanvas);
+    document.body.appendChild(minimapCard);
+  }
+
+  function updateMinimap() {
+    if (!objects.minimapCtx) return;
+    const size = objects.minimapCanvas.width;
+    objects.minimapCtx.clearRect(0, 0, size, size);
+
+    objects.minimapCtx.strokeStyle = '#333';
+    objects.minimapCtx.lineWidth = 2;
+    objects.minimapCtx.strokeRect(0, 0, size, size);
+
+    const px = (state.playerWorldX + PLAYER_RADIUS) * (size / WORLD_SIZE);
+    const py = (state.playerWorldY + PLAYER_RADIUS) * (size / WORLD_SIZE);
+    objects.minimapCtx.fillStyle = 'blue';
+    objects.minimapCtx.beginPath();
+    objects.minimapCtx.arc(px, py, 4, 0, Math.PI * 2);
+    objects.minimapCtx.fill();
+
+    objects.enemies.forEach(enemy => {
+      const ex = (enemy.x + enemy.size / 2) * (size / WORLD_SIZE);
+      const ey = (enemy.y + enemy.size / 2) * (size / WORLD_SIZE);
+      objects.minimapCtx.fillStyle = 'red';
+      objects.minimapCtx.beginPath();
+      objects.minimapCtx.arc(ex, ey, 2, 0, Math.PI * 2);
+      objects.minimapCtx.fill();
+    });
+  }
+
+  // Upgrade System
   function createUpgradeMenu() {
     const upgradeMenu = document.createElement('div');
     upgradeMenu.className = 'upgradeMenu';
@@ -694,165 +478,102 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const pointsDisplay = document.createElement('div');
     pointsDisplay.className = 'upgradePointsDisplay';
-    pointsDisplay.textContent = 'Points: ' + points;
+    pointsDisplay.textContent = 'Points: ' + state.points;
     pointsDisplay.id = 'upgradePointsDisplay';
 
-    const speedUpgrade = createUpgradeButton('Speed', speedLevel, 'Increases movement speed', upgradeSpeed);
-    const healthUpgrade = createUpgradeButton('Health', healthLevel, 'Increases maximum health and fully heals', upgradeHealth);
-    const damageUpgrade = createUpgradeButton('Damage', damageLevel, 'Increases bullet damage', upgradeDamage);
-    const reloadUpgrade = createUpgradeButton('Reload Speed', reloadLevel, 'Decreases reload time', upgradeReload);
-    const bulletSpeedUpgrade = createUpgradeButton('Bullet Speed', bulletSpeedLevel, 'Increases bullet travel speed', upgradeBulletSpeed);
+    const upgrades = [
+      { name: 'Speed', level: state.speedLevel, desc: 'Increases movement speed', func: upgradeSpeed },
+      { name: 'Health', level: state.healthLevel, desc: 'Increases maximum health and fully heals', func: upgradeHealth },
+      { name: 'Damage', level: state.damageLevel, desc: 'Increases bullet damage', func: upgradeDamage },
+      { name: 'Reload Speed', level: state.reloadLevel, desc: 'Decreases reload time', func: upgradeReload },
+      { name: 'Bullet Speed', level: state.bulletSpeedLevel, desc: 'Increases bullet travel speed', func: upgradeBulletSpeed }
+    ];
 
     upgradeContent.appendChild(upgradeTitle);
     upgradeContent.appendChild(pointsDisplay);
-    upgradeContent.appendChild(speedUpgrade);
-    upgradeContent.appendChild(healthUpgrade);
-    upgradeContent.appendChild(damageUpgrade);
-    upgradeContent.appendChild(reloadUpgrade);
-    upgradeContent.appendChild(bulletSpeedUpgrade);
+    upgrades.forEach(upgrade => upgradeContent.appendChild(createUpgradeButton(upgrade)));
     upgradeMenu.appendChild(upgradeContent);
-
     document.body.appendChild(upgradeMenu);
-
-    return upgradeMenu;
   }
 
-  function createUpgradeButton(name, level, description, onClick) {
+  function createUpgradeButton(upgrade) {
     const button = document.createElement('div');
     button.className = 'upgradeButton';
-    button.dataset.upgradeType = name.toLowerCase().replace(' ', '-');
+    button.dataset.upgradeType = upgrade.name.toLowerCase().replace(' ', '-');
 
     const buttonTop = document.createElement('div');
     buttonTop.className = 'upgradeButtonTop';
 
     const buttonName = document.createElement('span');
-    buttonName.textContent = name + ' (Lv. ' + level + ')';
+    buttonName.textContent = `${upgrade.name} (Lv. ${upgrade.level})`;
     buttonName.className = 'upgradeButtonName';
 
     const buttonDesc = document.createElement('span');
-    buttonDesc.textContent = description;
+    buttonDesc.textContent = upgrade.desc;
     buttonDesc.className = 'upgradeButtonDesc';
 
     buttonTop.appendChild(buttonName);
     buttonTop.appendChild(buttonDesc);
 
-    const cost = Math.pow(level + 1, 3);
+    // Calculate cost based on current level (times bought)
+    const cost = Math.pow(upgrade.level + 1, 3);
     const buttonAction = document.createElement('button');
-    buttonAction.textContent = 'Upgrade (' + cost + ' points)';
+    buttonAction.textContent = `Upgrade (${cost} points)`;
     buttonAction.className = 'upgradeActionBtn';
-    buttonAction.addEventListener('click', onClick);
-
-    buttonAction._clickHandler = onClick;
-
-    if (points < cost) {
-      buttonAction.disabled = true;
-    }
+    buttonAction.addEventListener('click', upgrade.func);
+    buttonAction.disabled = state.points < cost;
 
     button.appendChild(buttonTop);
     button.appendChild(buttonAction);
-
     return button;
   }
 
-  function upgradeSpeed() {
-    const cost = Math.pow(speedLevel + 1, 3);
-    if (points >= cost) {
-      points -= cost;
-      moveSpeed += 1;
-      speedLevel++;
-      updateAllPointsDisplays();
-      updateUpgradeMenu();
-    }
-  }
+  function upgradeSpeed() { performUpgrade('speed', () => state.moveSpeed += 1); }
+  function upgradeHealth() { performUpgrade('health', () => { state.maxPlayerHealth += 1; state.playerHealth = state.maxPlayerHealth; }); }
+  function upgradeDamage() { performUpgrade('damage', () => state.playerDamage += 1); }
+  function upgradeReload() { performUpgrade('reload', () => state.shotCooldown = Math.max(50, state.shotCooldown - 10)); }
+  function upgradeBulletSpeed() { performUpgrade('bulletSpeed', () => state.bulletSpeed += 1); }
 
-  function upgradeHealth() {
-    const cost = Math.pow(healthLevel + 1, 3);
-    if (points >= cost) {
-      points -= cost;
-      maxPlayerHealth += 1;
-      playerHealth = maxPlayerHealth;
-      healthLevel++;
-      updateAllPointsDisplays();
+  function performUpgrade(type, upgradeFunc) {
+    const currentLevel = state[`${type}Level`];
+    const cost = Math.pow(currentLevel + 1, 3);
+    if (state.points >= cost) {
+      state.points -= cost;
+      upgradeFunc();
+      state[`${type}Level`]++;
+      updatePoints();
       updatePlayerHealth();
-      updateUpgradeMenu();
-    }
-  }
-
-  function upgradeDamage() {
-    const cost = Math.pow(damageLevel + 1, 3);
-    if (points >= cost) {
-      points -= cost;
-      playerDamage += 1;
-      damageLevel++;
-      updateAllPointsDisplays();
-      updateUpgradeMenu();
-    }
-  }
-
-  function upgradeReload() {
-    const cost = Math.pow(reloadLevel + 1, 3);
-    if (points >= cost) {
-      points -= cost;
-      shotCooldown = Math.max(50, shotCooldown - 10);
-      reloadLevel++;
-      updateAllPointsDisplays();
-      updateUpgradeMenu();
-    }
-  }
-
-  function upgradeBulletSpeed() {
-    const cost = Math.pow(bulletSpeedLevel + 1, 3);
-    if (points >= cost) {
-      points -= cost;
-      bulletSpeed += 1;
-      bulletSpeedLevel++;
-      updateAllPointsDisplays();
       updateUpgradeMenu();
     }
   }
 
   function updateUpgradeMenu() {
     const upgradeMenu = document.querySelector('.upgradeMenu');
-    if (upgradeMenu) {
-      const pointsDisplay = upgradeMenu.querySelector('.upgradePointsDisplay');
-      if (pointsDisplay) {
-        pointsDisplay.textContent = 'Points: ' + points;
-      }
+    if (!upgradeMenu) return;
 
-      const upgradeButtons = upgradeMenu.querySelectorAll('.upgradeButton');
-      upgradeButtons.forEach(button => {
-        const nameElement = button.querySelector('.upgradeButtonName');
-        const actionBtn = button.querySelector('.upgradeActionBtn');
+    const pointsDisplay = upgradeMenu.querySelector('.upgradePointsDisplay');
+    if (pointsDisplay) pointsDisplay.textContent = 'Points: ' + state.points;
 
-        if (nameElement && actionBtn) {
-          const nameText = nameElement.textContent;
-          let upgradeType, currentLevel;
+    const upgradeButtons = upgradeMenu.querySelectorAll('.upgradeButton');
+    upgradeButtons.forEach(button => {
+      const nameElement = button.querySelector('.upgradeButtonName');
+      const actionBtn = button.querySelector('.upgradeActionBtn');
+      if (!nameElement || !actionBtn) return;
 
-          if (nameText.includes('Reload')) {
-            upgradeType = 'reload';
-            currentLevel = reloadLevel;
-          } else if (nameText.includes('Health')) {
-            upgradeType = 'health';
-            currentLevel = healthLevel;
-          } else if (nameText.includes('Damage')) {
-            upgradeType = 'damage';
-            currentLevel = damageLevel;
-          } else if (nameText.includes('Speed') && !nameText.includes('Bullet')) {
-            upgradeType = 'speed';
-            currentLevel = speedLevel;
-          } else if (nameText.includes('Bullet')) {
-            upgradeType = 'bulletSpeed';
-            currentLevel = bulletSpeedLevel;
-          }
+      const nameText = nameElement.textContent;
+      let currentLevel = 0;
 
-          if (upgradeType) {
-            const cost = Math.pow(currentLevel + 1, 3);
-            nameElement.textContent = nameText.split(' (Lv. ')[0] + ' (Lv. ' + currentLevel + ')';
-            actionBtn.textContent = 'Upgrade (' + cost + ' points)';
-          }
-        }
-      });
-    }
+      if (nameText.includes('Reload')) currentLevel = state.reloadLevel;
+      else if (nameText.includes('Health')) currentLevel = state.healthLevel;
+      else if (nameText.includes('Damage')) currentLevel = state.damageLevel;
+      else if (nameText.includes('Speed') && !nameText.includes('Bullet')) currentLevel = state.speedLevel;
+      else if (nameText.includes('Bullet')) currentLevel = state.bulletSpeedLevel;
+
+      // Calculate cost based on current level
+      const cost = Math.pow(currentLevel + 1, 3);
+      nameElement.textContent = nameText.split(' (Lv. ')[0] + ' (Lv. ' + currentLevel + ')';
+      actionBtn.textContent = 'Upgrade (' + cost + ' points)';
+    });
   }
 
   function refreshUpgradeButtons() {
@@ -866,178 +587,178 @@ document.addEventListener('DOMContentLoaded', function () {
       if (!actionBtn || !nameElement) return;
 
       let currentLevel = 0;
-      let cost = 0;
+      const nameText = nameElement.textContent;
 
-      if (nameElement.textContent.includes('Reload')) {
-        currentLevel = reloadLevel;
-        cost = Math.pow(currentLevel + 1, 3);
-      } else if (nameElement.textContent.includes('Health')) {
-        currentLevel = healthLevel;
-        cost = Math.pow(currentLevel + 1, 3);
-      } else if (nameElement.textContent.includes('Damage')) {
-        currentLevel = damageLevel;
-        cost = Math.pow(currentLevel + 1, 3);
-      } else if (nameElement.textContent.includes('Speed') && !nameElement.textContent.includes('Bullet')) {
-        currentLevel = speedLevel;
-        cost = Math.pow(currentLevel + 1, 3);
-      } else if (nameElement.textContent.includes('Bullet')) {
-        currentLevel = bulletSpeedLevel;
-        cost = Math.pow(currentLevel + 1, 3);
-      }
-      actionBtn.disabled = points < cost;
+      if (nameText.includes('Reload')) currentLevel = state.reloadLevel;
+      else if (nameText.includes('Health')) currentLevel = state.healthLevel;
+      else if (nameText.includes('Damage')) currentLevel = state.damageLevel;
+      else if (nameText.includes('Speed') && !nameText.includes('Bullet')) currentLevel = state.speedLevel;
+      else if (nameText.includes('Bullet')) currentLevel = state.bulletSpeedLevel;
+
+      // Calculate cost based on current level
+      const cost = Math.pow(currentLevel + 1, 3);
+      actionBtn.disabled = state.points < cost;
     });
   }
 
-
-  function openUpgradeMenu() {
-    if (!upgradeMenuOpen) {
-      upgradeMenuOpen = true;
-      gamePaused = true;
-      const upgradeMenu = document.querySelector('.upgradeMenu');
-      if (upgradeMenu) {
-        upgradeMenu.style.display = 'flex';
-        setTimeout(() => {
-          upgradeMenu.classList.add('menuOpen');
-        }, 10);
-        document.querySelector('.gameContainer').classList.add('menuOpen');
-      }
-    }
-  }
-
-  function closeUpgradeMenu() {
-    if (upgradeMenuOpen) {
-      upgradeMenuOpen = false;
-      gamePaused = false;
-      const upgradeMenu = document.querySelector('.upgradeMenu');
-      if (upgradeMenu) {
-        upgradeMenu.classList.remove('menuOpen');
-        setTimeout(() => {
-          upgradeMenu.style.display = 'none';
-        }, 300);
-        document.querySelector('.gameContainer').classList.remove('menuOpen');
-      }
-    }
-  }
-
   function toggleUpgradeMenu() {
-    if (upgradeMenuOpen) {
-      closeUpgradeMenu();
+    state.upgradeMenuOpen = !state.upgradeMenuOpen;
+    state.gamePaused = state.upgradeMenuOpen;
+
+    const upgradeMenu = document.querySelector('.upgradeMenu');
+    if (!upgradeMenu) return;
+
+    if (state.upgradeMenuOpen) {
+      upgradeMenu.style.display = 'flex';
+      gameScreen.classList.add('menuOpen');
+      setTimeout(() => upgradeMenu.classList.add('menuOpen'), 10);
     } else {
-      openUpgradeMenu();
+      upgradeMenu.classList.remove('menuOpen');
+      gameScreen.classList.remove('menuOpen');
+      setTimeout(() => upgradeMenu.style.display = 'none', 300);
     }
   }
 
-  document.addEventListener('keydown', e => {
-    if (e.key) keys[e.key.toLowerCase()] = true;
+  // Game Flow Functions
+  function startGame() {
+    startScreen.style.display = 'none';
+    gameScreen.style.display = 'block';
+    initGame();
+  }
 
-    if (e.key === 'Tab' && inGame) {
-      e.preventDefault();
-      toggleUpgradeMenu();
-    }
-  });
+  function gameOver() {
+    state.inGame = false;
+    clearEnemies();
+    objects.balls.forEach(ball => ball.element.remove());
+    objects.balls.length = 0;
 
-  document.addEventListener('keyup', e => {
-    if (e.key) keys[e.key.toLowerCase()] = false;
-  });
+    const deathScreen = document.createElement('div');
+    deathScreen.className = 'deathScreen';
+    deathScreen.innerHTML = `
+      <div class="deathContent">
+        <div class="deathTitle">Game Over</div>
+        <div class="deathScore">Final Score: ${state.points}</div>
+        <button class="deathButton" id="restartBtn">Continue</button>
+      </div>
+    `;
 
-  document.addEventListener('mousemove', e => {
-    mouseScreenX = e.clientX;
-    mouseScreenY = e.clientY;
-  });
+    document.body.appendChild(deathScreen);
+    setTimeout(() => deathScreen.classList.add('show'), 10);
 
-  document.addEventListener('mousedown', e => {
-    if (e.button === 0 && inGame && !upgradeMenuOpen) {
-      mouseDown = true;
-      shoot();
-    }
-  });
+    document.getElementById('restartBtn').addEventListener('click', () => {
+      deathScreen.remove();
+      resetGame();
+      startGame();
+    });
+  }
 
-  document.addEventListener('mouseup', e => {
-    if (e.button === 0) {
-      mouseDown = false;
-    }
-  });
+  function resetGame() {
+    state = {
+      ...state,
+      inGame: false,
+      gamePaused: false,
+      upgradeMenuOpen: false,
+      playerHealth: 5,
+      maxPlayerHealth: 5,
+      points: 0,
+      triangleSpawnCounter: 0,
+      pentagonSpawnCounter: 0,
+      moveSpeed: 5,
+      shotCooldown: 250,
+      playerDamage: 1,
+      bulletSpeed: 8,
+      // RESET upgrade levels to 0 on death
+      speedLevel: 0,
+      healthLevel: 0,
+      damageLevel: 0,
+      reloadLevel: 0,
+      bulletSpeedLevel: 0
+    };
 
-  document.addEventListener('dragstart', e => {
-    e.preventDefault();
-  });
+    objects.balls.forEach(ball => ball.element.remove());
+    objects.enemies.forEach(enemy => enemy.element.remove());
+    objects.balls.length = 0;
+    objects.enemies.length = 0;
 
-  document.addEventListener('selectstart', e => {
-    e.preventDefault();
-  });
+    if (objects.playerContainer) objects.playerContainer.remove();
+    objects.playerContainer = null;
+    
+    // Update UI to reflect reset state
+    updatePlayerHealth();
+    updatePoints();
+    updateUpgradeMenu(); // Refresh upgrade menu to show reset prices
+  }
 
-  document.addEventListener('contextmenu', e => {
-    e.preventDefault();
-  });
+  // Game Loop
+  function gameLoop() {
+    if (!state.inGame) return;
 
-  document.body.style.userSelect = 'none';
-  document.body.style.webkitUserSelect = 'none';
-  document.body.style.mozUserSelect = 'none';
-  document.body.style.msUserSelect = 'none';
+    const currentTime = Date.now();
+    const delta = Math.min((currentTime - state.lastTime) / FRAME_TIME, 2);
+    state.lastTime = currentTime;
 
-  let lastTime = 0;
-  let lastSpawnTime = 0;
-  function gameLoop(timestamp) {
-    if (!lastTime) lastTime = timestamp;
-
-    let deltaMS = timestamp - lastTime;
-    lastTime = timestamp;
-
-    if (deltaMS > 100) deltaMS = 100;
-
-    let delta = deltaMS / frameTime;
-
-    delta = Math.min(delta, 2.0);
-
-    if (!gamePaused) {
-      updateAim();
-
-      if (mouseDown && inGame && !upgradeMenuOpen) {
-        shoot();
-      }
-
-      let dx = 0, dy = 0;
-      if (keys['w'] || keys['arrowup']) dy -= moveSpeed * delta;
-      if (keys['s'] || keys['arrowdown']) dy += moveSpeed * delta;
-      if (keys['a'] || keys['arrowleft']) dx -= moveSpeed * delta;
-      if (keys['d'] || keys['arrowright']) dx += moveSpeed * delta;
-
-      if (dx !== 0 || dy !== 0) {
-        movePlayer(dx, dy);
-      }
-
-      updateBalls(delta);
-      updateEnemies(delta);
-      checkCollisions();
-
-      if (timestamp - lastSpawnTime > 2000) {
-        spawnEnemies();
-        lastSpawnTime = timestamp;
-      }
-
-      updateMinimap();
+    if (!state.gamePaused) {
+      updateGameState(delta);
     }
 
     requestAnimationFrame(gameLoop);
   }
 
-  playBtn.addEventListener('click', () => {
-    if (playerNameInput.value.trim() === '') {
-      alert('Please enter your name!');
-      return;
-    }
-    startScreen.style.display = 'none';
-    gameScreen.style.display = 'block';
-    createArena();
-    createPlayer();
-    initUI();
-    createMinimap();
-    createUpgradeMenu();
-    gameLoop();
-    inGame = true;
-  });
+  function updateGameState(delta) {
+    updateInput(delta);
+    updateAim();
+    updateBalls(delta);
+    updateEnemies(delta);
+    checkCollisions();
+    updateMinimap();
 
-  window.addEventListener('resize', () => {
-    if (playerContainer) updateCamera();
-  });
+    if (Date.now() - state.lastSpawnTime > 1000) {
+      spawnEnemies();
+      state.lastSpawnTime = Date.now();
+    }
+  }
+
+  function updateInput(delta) {
+    if (state.keys['w']) movePlayer(0, -state.moveSpeed * delta);
+    if (state.keys['s']) movePlayer(0, state.moveSpeed * delta);
+    if (state.keys['a']) movePlayer(-state.moveSpeed * delta, 0);
+    if (state.keys['d']) movePlayer(state.moveSpeed * delta, 0);
+    if (state.mouseDown) shoot();
+  }
+
+  // Event Listeners
+  function setupEventListeners() {
+    playBtn.addEventListener('click', startGame);
+    playerNameInput.addEventListener('keypress', e => e.key === 'Enter' && startGame());
+
+    document.addEventListener('keydown', e => {
+      if (!state.inGame) return;
+      const key = e.key.toLowerCase();
+      state.keys[key] = true;
+      if (key === 'tab') {
+        e.preventDefault();
+        toggleUpgradeMenu();
+      }
+    });
+
+    document.addEventListener('keyup', e => state.keys[e.key.toLowerCase()] = false);
+
+    document.addEventListener('mousedown', e => {
+      if (state.inGame && !state.gamePaused) state.mouseDown = true;
+    });
+
+    document.addEventListener('mouseup', () => state.mouseDown = false);
+
+    document.addEventListener('mousemove', e => {
+      state.mouseScreenX = e.clientX;
+      state.mouseScreenY = e.clientY;
+    });
+
+    window.addEventListener('resize', () => {
+      if (state.inGame) updateCamera();
+    });
+  }
+
+  // Initialize
+  setupEventListeners();
 });
