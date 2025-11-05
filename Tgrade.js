@@ -18,6 +18,20 @@ document.addEventListener('DOMContentLoaded', function () {
   const SUB_GRID_SIZE = 5;
   const WORLD_SIZE = Math.max(window.innerWidth, window.innerHeight) * 1.5;
   const MINIMAP_SIZE = 150;
+  const BOSS_FIRE_RATE = 500;
+  const BOSS_ATK1_RATE = 3000;
+  const BOSS_ATK2_RATE = 4000;
+  const BOSS_ATK3_RATE = 8000;
+  const BOSS_ATK4_RATE = 12000;
+
+
+  // Boss Configuration
+  const BOSS_CONFIG = {
+    size: 120,
+    health: 50,
+    rotationSpeed: 50, // radians per frame
+    points: 50
+  };
 
   // Game State
   let state = {
@@ -50,7 +64,9 @@ document.addEventListener('DOMContentLoaded', function () {
     healthLevel: 0,
     damageLevel: 0,
     reloadLevel: 0,
-    bulletSpeedLevel: 0
+    bulletSpeedLevel: 0,
+    bossActive: false,
+    bossSpawned: false
   };
 
   // Game Objects
@@ -62,7 +78,9 @@ document.addEventListener('DOMContentLoaded', function () {
     minimapCanvas: null,
     minimapCtx: null,
     balls: [],
-    enemies: []
+    bballs: [],
+    enemies: [],
+    boss: null
   };
 
   // Core Game Functions
@@ -153,7 +171,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!objects.playerHealthBar) return;
     const healthPercent = (state.playerHealth / state.maxPlayerHealth) * 100;
     objects.playerHealthBar.style.width = healthPercent + '%';
-    
+
     if (healthPercent > 60) objects.playerHealthBar.className = 'progress-bar bg-success';
     else if (healthPercent > 30) objects.playerHealthBar.className = 'progress-bar bg-warning';
     else objects.playerHealthBar.className = 'progress-bar bg-danger';
@@ -213,7 +231,162 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   }
 
+  // boss shoot
+  function bossShoot() {
+    const bballnum = 18;
+    const bballsize = 20;
+    const vel = 8;
+    const bossCenterX = objects.boss.x + objects.boss.size / 2;
+    const bossCenterY = objects.boss.y + objects.boss.size / 2;
+    for (let i = 0; i < bballnum; i++) {
+      const angle = (i / bballnum) * Math.PI * 2;
+      const bball = document.createElement('div');
+      bball.className = 'bball';
+      bball.style.cssText = `
+        width:${bballsize}px;
+        height:${bballsize}px;
+        position:absolute;
+        left:${bossCenterX}px;
+        top:${bossCenterY}px;
+        transform: translate(-50%,-50%);
+        background-color:red;
+        border:2px solid black;
+      `;
+      gameWorld.appendChild(bball);
+      const vx = Math.cos(angle) * vel;
+      const vy = Math.sin(angle) * vel;
+      objects.bballs.push({
+        element: bball,
+        x: bossCenterX,
+        y: bossCenterY,
+        vx: vx,
+        vy: vy,
+        size: bballsize,
+        damage: 4
+      });
+    }
+  }
+
+  function bossShoot1(balln, balls, vel, angleOffset) {
+    const bballnum = balln;
+    const bballsize = balls;
+    const bossCenterX = objects.boss.x + objects.boss.size / 2;
+    const bossCenterY = objects.boss.y + objects.boss.size / 2;
+    for (let i = 0; i < bballnum; i++) {
+      const angle = ((i / bballnum) * Math.PI * 2) + angleOffset;
+      const bball = document.createElement('div');
+      bball.className = 'bball';
+      bball.style.cssText = `
+        width:${bballsize}px;
+        height:${bballsize}px;
+        position:absolute;
+        left:${bossCenterX}px;
+        top:${bossCenterY}px;
+        transform: translate(-50%,-50%);
+        background-color:red;
+        border:2px solid black;
+      `;
+      gameWorld.appendChild(bball);
+      const vx = Math.cos(angle) * vel;
+      const vy = Math.sin(angle) * vel;
+      objects.bballs.push({
+        element: bball,
+        x: bossCenterX,
+        y: bossCenterY,
+        vx: vx,
+        vy: vy,
+        size: bballsize,
+        damage: 4
+      });
+    }
+  }
+
+
+  // fire rat is in game constants
+  let bossFireRate = null;
+  let bossAtk1Rate = null;
+  let bossAtk2Rate = null;
+  let bossAtk3Rate = null;
+  let bossAtk4Rate = null;
+
+  function clearBossTimers() {
+    if (bossFireRate) { clearInterval(bossFireRate); bossFireRate = null; }
+    if (bossAtk1Rate) { clearInterval(bossAtk1Rate); bossAtk1Rate = null; }
+    if (bossAtk2Rate) { clearInterval(bossAtk2Rate); bossAtk2Rate = null; }
+    if (bossAtk3Rate) { clearInterval(bossAtk3Rate); bossAtk3Rate = null; }
+    if (bossAtk4Rate) { clearInterval(bossAtk4Rate); bossAtk4Rate = null; }
+  }
+
+  function bossAttack() {
+    clearBossTimers();
+    bossFireRate = setInterval(() => {
+      if (state.bossActive && objects.boss) {
+        bossShoot();
+      } else {
+        clearInterval(bossFireRate);
+      }
+    }, BOSS_FIRE_RATE);
+
+
+    bossAtkRate = setInterval(() => {
+      if (state.bossActive && objects.boss) {
+        bossShoot1(48, 12, 3, 5);
+      } else {
+        clearInterval(bossAtk1Rate);
+        bossAtk1Rate = null;
+      }
+    }, BOSS_ATK1_RATE);
+
+    bossAtk2Rate = setInterval(() => {
+      if (state.bossActive && objects.boss) {
+        bossShoot1(24, 16, 4, 10);
+      } else {
+        clearInterval(bossAtk2Rate);
+        bossAtk2Rate = null;
+      }
+    }, BOSS_ATK2_RATE);
+
+    bossAtk3Rate = setInterval(() => {
+      if (state.bossActive && objects.boss) {
+        bossShoot1(12, 20, 5, 15);
+      } else {
+        clearInterval(bossAtk3Rate);
+        bossAtk3Rate = null;
+      }
+    }, BOSS_ATK3_RATE);
+
+    bossAtk4Rate = setInterval(() => {
+      if (state.bossActive && objects.boss) {
+        bossShoot1(80, 15, 6, 20);
+      } else {
+        clearInterval(bossAtk4Rate);
+        bossAtk4Rate = null;
+      }
+    }, BOSS_ATK4_RATE);
+  }
+
+
+  function updateBballs(delta) {
+    for (let i = objects.bballs.length - 1; i >= 0; i--) {
+      const bball = objects.bballs[i];
+      bball.x += bball.vx * delta;
+      bball.y += bball.vy * delta;
+      bball.element.style.left = bball.x + 'px';
+      bball.element.style.top = bball.y + 'px';
+
+      if (bball.x < 0 || bball.x > WORLD_SIZE || bball.y < 0 || bball.y > WORLD_SIZE) {
+        bball.element.remove();
+        objects.bballs.splice(i, 1);
+      }
+    }
+  }
+
   // Combat Functions
+  //function dodge() {
+    
+
+  //}
+
   function shoot() {
     const currentTime = Date.now();
     if (currentTime - state.lastShotTime < state.shotCooldown) return;
@@ -351,6 +524,298 @@ document.addEventListener('DOMContentLoaded', function () {
     setTimeout(() => enemy.element.parentNode && enemy.element.remove(), 300);
   }
 
+
+  const audioboss = document.getElementById('bossmusic');
+  // Modify the createBoss function to handle boss respawn/despawn
+  function createBoss() {
+    audioboss.play();
+    if (audioboss) {
+      const p = audioboss.play();
+      if (p && typeof p.catch === 'function') p.catch(() => { });
+    }
+    // If boss is already active, kill it and return to normal
+    if (state.bossActive) {
+      killBoss();
+      clearBossTimers();
+      return;
+    }
+
+    if (state.bossSpawned) return;
+
+    // Clear all current enemies without awarding points
+    clearEnemiesWithoutPoints();
+
+    state.bossActive = true;
+    state.bossSpawned = true;
+
+    const boss = document.createElement('div');
+    boss.className = 'enemy boss';
+    boss.style.cssText = `
+      width: ${BOSS_CONFIG.size}px;
+      height: ${BOSS_CONFIG.size}px;
+      background-color: black;
+      border: 3px solid darkred;
+      position: absolute;
+      left: ${WORLD_SIZE / 2 - BOSS_CONFIG.size / 2}px;
+      top: ${WORLD_SIZE / 2 - BOSS_CONFIG.size / 2}px;
+      z-index: 10;`;
+
+    gameWorld.appendChild(boss);
+
+    objects.boss = {
+      element: boss,
+      x: WORLD_SIZE / 2 - BOSS_CONFIG.size / 2,
+      y: WORLD_SIZE / 2 - BOSS_CONFIG.size / 2,
+      size: BOSS_CONFIG.size,
+      health: BOSS_CONFIG.health,
+      maxHealth: BOSS_CONFIG.health,
+      rotation: 0,
+      points: BOSS_CONFIG.points,
+      Rectangles: []
+    };
+
+    createBossRectangles(objects.boss, { count: 3, size: 22, radius: Math.max(BOSS_CONFIG.size, 80), baseSpeed: 0.02 });
+    bossAttack();
+  }
+
+  function createBossRectangles(bossrect, rpts) {
+    const opts = rpts || {};
+    const count = opts.count || 3;
+    const width = opts.width || 80;  // Separate width and height
+    const height = opts.height || 22;
+    const radius = opts.radius || (BOSS_CONFIG.size + 50); // Increased radius for better visibility
+    const baseSpeed = (typeof opts.baseSpeed === 'number') ? opts.baseSpeed : 0.02;
+
+    const centerX = bossrect.x + bossrect.size / 2;
+    const centerY = bossrect.y + bossrect.size / 2;
+
+    for (let i = 0; i < count; i++) {
+      const rect = document.createElement('div');
+      rect.className = 'bossRectangles';
+      rect.style.cssText = `
+      position: absolute;
+      width: ${width}px;
+      height: ${height}px;
+      background-color: black;
+      border: 3px solid darkred;
+      box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+      z-index: 12;
+      transform-origin: center center;
+    `;
+
+      const angle = (i / count) * Math.PI * 2;
+      const speed = baseSpeed;
+
+      // Calculate initial position
+      const rx = centerX + Math.cos(angle) * radius;
+      const ry = centerY + Math.sin(angle) * radius;
+
+      bossrect.Rectangles.push({
+        element: rect,
+        angle: angle,
+        radius: radius,
+        speed: speed,
+        width: width,
+        height: height,
+        x: rx - width / 2,  // Center the rectangle horizontally
+        y: ry - height / 2  // Center the rectangle vertically
+      });
+
+      // Set initial position
+      rect.style.left = (rx - width / 2) + 'px';
+      rect.style.top = (ry - height / 2) + 'px';
+
+      gameWorld.appendChild(rect);
+    }
+  }
+
+  function killBoss() {
+    if (!objects.boss) return;
+    audioboss.pause();
+    audioboss.currentTime = 0;
+
+    clearBossTimers();
+
+    if (bossFireRate) {
+      clearInterval(bossFireRate);
+      bossFireRate = null;
+    }
+
+    enemyDeathAnimation(objects.boss);
+    if (objects.boss.Rectangles) {
+      objects.boss.Rectangles.forEach(o => o.element.parentNode && o.element.remove());
+      objects.boss.Rectangles.length = 0;
+    }
+    objects.boss.element.parentNode && objects.boss.element.remove();
+    objects.boss = null;
+    state.bossActive = false;
+    state.bossSpawned = false;
+  }
+
+  function clearEnemiesWithoutPoints() {
+    objects.enemies.forEach(enemy => {
+      enemyDeathAnimation(enemy);
+    });
+    objects.enemies.length = 0;
+  }
+
+  function updateBoss(delta) {
+    if (!objects.boss) return;
+
+    // Rotate the boss
+    objects.boss.rotation += BOSS_CONFIG.rotationSpeed * delta;
+    objects.boss.element.style.transform = `rotate(${objects.boss.rotation}rad)`;
+
+    // Update boss rectangles
+    if (objects.boss.Rectangles && objects.boss.Rectangles.length) {
+      const bossCenterX = objects.boss.x + objects.boss.size / 2;
+      const bossCenterY = objects.boss.y + objects.boss.size / 2;
+
+      objects.boss.Rectangles.forEach(rect => {
+        rect.angle += rect.speed * delta;
+        rect.x = bossCenterX + Math.cos(rect.angle) * rect.radius - rect.width / 2;
+        rect.y = bossCenterY + Math.sin(rect.angle) * rect.radius - rect.height / 2;
+        rect.element.style.left = rect.x + "px";
+        rect.element.style.top = rect.y + "px";
+
+        const vx = -Math.sin(rect.angle) * rect.radius * rect.speed;
+        const vy = Math.cos(rect.angle) * rect.radius * rect.speed;
+        const facing = Math.atan2(vy, vx);
+        rect.element.style.transform = `rotate(${facing}rad)`;
+      });
+    }
+  }
+
+  function checkBossCollisions() {
+    if (!objects.boss) return;
+
+    const bossCenterX = objects.boss.x + objects.boss.size / 2;
+    const bossCenterY = objects.boss.y + objects.boss.size / 2;
+    const playerCenterX = state.playerWorldX + PLAYER_RADIUS;
+    const playerCenterY = state.playerWorldY + PLAYER_RADIUS;
+
+    //player to boss ball
+    for (let i = objects.bballs.length - 1; i >= 0; i--) {
+      const bball = objects.bballs[i];
+      const bballCenterX = bball.x;
+      const bballCenterY = bball.y;
+      const dx = bballCenterX - playerCenterX;
+      const dy = bballCenterY - playerCenterY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance < (bball.size / 2 + PLAYER_RADIUS)) {
+        state.playerHealth -= bball.damage;
+        updatePlayerHealth();
+        bball.element.parentNode && bball.element.remove();
+        objects.bballs.splice(i, 1);
+        if (state.playerHealth <= 0) {
+          gameOver();
+        }
+      }
+    }
+
+    // Ball-Boss collisions
+    for (let i = objects.balls.length - 1; i >= 0; i--) {
+      const ball = objects.balls[i];
+      const ballCenterX = ball.x + ball.size / 2;
+      const ballCenterY = ball.y + ball.size / 2;
+
+      const dx = ballCenterX - bossCenterX;
+      const dy = ballCenterY - bossCenterY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      // rect colision check for balls
+      if (objects.boss.Rectangles && objects.boss.Rectangles.length) {
+        for (let j = objects.boss.Rectangles.length - 1; j >= 0; j--) {
+          const r = objects.boss.Rectangles[j];
+          const rectW = (r.width || r.size || (r.element && r.element.offsetWidth) || 0);
+          const rectH = (r.height || r.size || (r.element && r.element.offsetHeight) || 0);
+          const rectCenterX = r.x + rectW / 2;
+          const rectCenterY = r.y + rectH / 2;
+          const dxr = ballCenterX - rectCenterX;
+          const dyr = ballCenterY - rectCenterY;
+          const distRect = Math.sqrt(dxr * dxr + dyr * dyr);
+          const rectRadius = Math.max(rectW, rectH) / 2;
+          if (distRect < (ball.size / 2 + rectRadius)) {
+            // evil me rects return damage but 1
+            ball.element.parentNode && ball.element.remove();
+            objects.balls.splice(i, 1);
+            state.playerHealth -= 1;
+            updatePlayerHealth();
+            if (state.playerHealth <= 0) {
+              gameOver();
+            }
+          }
+        }
+        if (!objects.balls[i]) continue;
+      }
+
+
+      // actual boss colision
+      if (distance < (ball.size / 2 + objects.boss.size / 2)) {
+        objects.boss.health -= ball.damage;
+
+        if (objects.boss.health <= 0) {
+          state.points += objects.boss.points;
+          updatePoints();
+          enemyDeathAnimation(objects.boss);
+          if (objects.boss.Rectangles) {
+            objects.boss.Rectangles.forEach(o => o.element.parentNode && o.element.remove());
+            objects.boss.Rectangles.length = 0;
+          }
+
+
+          objects.boss = null;
+          state.bossActive = false;
+          state.bossSpawned = false; 
+          return; 
+        }
+
+        ball.element.parentNode && ball.element.remove();
+        objects.balls.splice(i, 1);
+      }
+    }
+
+    // Player-Boss collision
+    const dx = playerCenterX - bossCenterX;
+    const dy = playerCenterY - bossCenterY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    //player boss core collision
+    if (distance < (PLAYER_RADIUS + objects.boss.size / 2)) {
+      state.playerHealth -= 99999999999999999999; // insta kill
+      updatePlayerHealth();
+
+      if (state.playerHealth <= 0) {
+        gameOver();
+      }
+    }
+
+    //player to rect colision
+    if (objects.boss.Rectangles && objects.boss.Rectangles.length) {
+      for (let j = objects.boss.Rectangles.length - 1; j >= 0; j--) {
+        const r = objects.boss.Rectangles[j];
+        const rectW = (r.width || r.size || (r.element && r.element.offsetWidth) || 0);
+        const rectH = (r.height || r.size || (r.element && r.element.offsetHeight) || 0);
+        const rectCenterX = r.x + rectW / 2;
+        const rectCenterY = r.y + rectH / 2;
+        const dxr = playerCenterX - rectCenterX;
+        const dyr = playerCenterY - rectCenterY;
+        const distRect = Math.sqrt(dxr * dxr + dyr * dyr);
+        const rectRadius = Math.max(rectW, rectH) / 2;
+
+        if (distRect < (PLAYER_RADIUS + rectRadius)) {
+          state.playerHealth -= 99999999999999999999; // insta kill
+          updatePlayerHealth();
+          r.element.parentNode && r.element.remove();
+          objects.boss.Rectangles.splice(j, 1);
+
+          if (state.playerHealth <= 0) {
+            gameOver();
+            return
+          }
+        }
+      }
+    }
+  }
+
   function checkCollisions() {
     const playerCenterX = state.playerWorldX + PLAYER_RADIUS;
     const playerCenterY = state.playerWorldY + PLAYER_RADIUS;
@@ -381,7 +846,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
           ball.element.remove();
           objects.balls.splice(i, 1);
-          break;
         }
       }
     }
@@ -404,14 +868,38 @@ document.addEventListener('DOMContentLoaded', function () {
         if (state.playerHealth <= 0) gameOver();
       }
     }
+
+    // Add boss collisions
+    checkBossCollisions();
   }
 
   function clearEnemies() {
     objects.enemies.forEach(enemy => enemy.element.parentNode && enemy.element.remove());
     objects.enemies.length = 0;
+
+    // Clear boss
+    if (objects.boss) {
+      if (objects.boss.Rectangles) {
+        objects.boss.Rectangles.forEach(o => o.element.parentNode && o.element.remove());
+        objects.boss.Rectangles.length = 0;
+      }
+      objects.boss.element.parentNode && objects.boss.element.remove();
+      objects.boss = null;
+      state.bossActive = false;
+      state.bossSpawned = false;
+    }
   }
 
   function spawnEnemies() {
+    // Don't spawn regular enemies if boss is active
+
+    if (state.points % 500 === 0 && state.points !== 0 && !state.bossActive && !state.bossSpawned) {
+      createBoss();
+      return;
+    }
+
+    if (state.bossActive) return;
+
     if (objects.enemies.length < 5) createSquareEnemy();
     if (state.points >= 10 && state.triangleSpawnCounter % 2 === 0) createRedSquareEnemy();
     if (state.points >= 20 && state.pentagonSpawnCounter % 4 === 0) createPurpleSquareEnemy();
@@ -461,6 +949,16 @@ document.addEventListener('DOMContentLoaded', function () {
       objects.minimapCtx.arc(ex, ey, 2, 0, Math.PI * 2);
       objects.minimapCtx.fill();
     });
+
+    // Draw boss on minimap
+    if (objects.boss) {
+      const bx = (objects.boss.x + objects.boss.size / 2) * (size / WORLD_SIZE);
+      const by = (objects.boss.y + objects.boss.size / 2) * (size / WORLD_SIZE);
+      objects.minimapCtx.fillStyle = 'darkred';
+      objects.minimapCtx.beginPath();
+      objects.minimapCtx.arc(bx, by, 5, 0, Math.PI * 2);
+      objects.minimapCtx.fill();
+    }
   }
 
   // Upgrade System
@@ -628,9 +1126,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function gameOver() {
     state.inGame = false;
+    clearBossTimers();
     clearEnemies();
     objects.balls.forEach(ball => ball.element.remove());
     objects.balls.length = 0;
+    objects.bballs.forEach(bball => bball.element.remove());
+    objects.bballs.length = 0;
 
     const deathScreen = document.createElement('div');
     deathScreen.className = 'deathScreen';
@@ -653,6 +1154,9 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function resetGame() {
+    audioboss.pause();
+    audioboss.currentTime = 0;
+    clearBossTimers();
     state = {
       ...state,
       inGame: false,
@@ -672,7 +1176,9 @@ document.addEventListener('DOMContentLoaded', function () {
       healthLevel: 0,
       damageLevel: 0,
       reloadLevel: 0,
-      bulletSpeedLevel: 0
+      bulletSpeedLevel: 0,
+      bossActive: false,
+      bossSpawned: false
     };
 
     objects.balls.forEach(ball => ball.element.remove());
@@ -680,9 +1186,19 @@ document.addEventListener('DOMContentLoaded', function () {
     objects.balls.length = 0;
     objects.enemies.length = 0;
 
+    if (objects.boss) {
+      if (objects.boss.Rectangles) {
+        objects.boss.Rectangles.forEach(r => r.element.remove());
+        objects.boss.Rectangles.length = 0;
+      }
+      objects.boss.element.remove();
+      objects.boss = null;
+
+    }
+
     if (objects.playerContainer) objects.playerContainer.remove();
     objects.playerContainer = null;
-    
+
     // Update UI to reflect reset state
     updatePlayerHealth();
     updatePoints();
@@ -708,7 +1224,9 @@ document.addEventListener('DOMContentLoaded', function () {
     updateInput(delta);
     updateAim();
     updateBalls(delta);
+    updateBballs(delta)
     updateEnemies(delta);
+    updateBoss(delta);
     checkCollisions();
     updateMinimap();
 
@@ -738,6 +1256,10 @@ document.addEventListener('DOMContentLoaded', function () {
       if (key === 'tab') {
         e.preventDefault();
         toggleUpgradeMenu();
+      }
+      // Toggle boss on 'b' key - spawn if no boss, kill if boss exists
+      if (key === 'b') {
+        createBoss(); // This now handles both spawning and killing
       }
     });
 

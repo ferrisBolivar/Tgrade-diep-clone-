@@ -342,3 +342,29 @@ body {
   z-index: 50;
   padding: 5px;
 }
+
+.enemy.boss {
+  background-color: black !important;
+  border: 3px solid darkred !important;
+  box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+}
+
+.bossRectangles {
+  position: absolute;
+  background-color: black;
+  border: 3px solid darkred;
+  box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+  z-index: 12;
+  transform-origin: center center;
+}
+
+.bball {
+  position: absolute;
+  border-radius: 50%;
+  background-color: #ea0404;
+  border: 2px solid black;
+  z-index: 15;
+  pointer-events: none;
+  width: 60px;
+  height: 60px;
+}
